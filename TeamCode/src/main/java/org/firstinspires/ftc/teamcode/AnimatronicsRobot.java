@@ -6,8 +6,10 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.TouchSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
+import com.vuforia.Rectangle;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
@@ -25,6 +27,7 @@ public class AnimatronicsRobot {
     private CRServo clawRotateMotor;
     private DcMotor lFoundationMotor;
     private DcMotor rFoundationMotor;
+    private Servo   stoneServoMotor;
 
     private TouchSensor scissorsTouch;
     private TouchSensor clawTouch;
@@ -41,6 +44,25 @@ public class AnimatronicsRobot {
 
     private static final double XY_WHEELS_THRESHOLD_POWER = 0.0f;
     private static final double XY_CLAW_THRESHOLD_POWER = 0.5f;
+
+    private static final double LEFT_FRONT_ERROR_PER_REV = 0.;
+    private static final double LEFT_BACK_ERROR_PER_REV = 0.0;
+    private static final double RIGHT_FRONT_ERROR_PER_REV = 0.0;
+    private static final double RIGHT_BACK_ERROR_PER_REV = 0.0;
+
+    private static final double LEFT_FRONT_LATERAL_ERROR_PER_REV = 0.0;
+    private static final double LEFT_BACK_LATERAL_ERROR_PER_REV = 0.0;
+    private static final double RIGHT_FRONT_LATERAL_ERROR_PER_REV = 0.0;
+    private static final double RIGHT_BACK_LATERAL_ERROR_PER_REV = 0.0;
+
+    private static final double LEFT_FRONT_LATERAL_ERROR_POWER = 1.0;
+    private static final double LEFT_BACK_LATERAL_ERROR_POWER = 1.0;
+    private static final double RIGHT_FRONT_LATERAL_ERROR_POWER = 1.0;
+    private static final double RIGHT_BACK_LATERAL_ERROR_POWER = 1.0;
+
+    public static final double QUARTER_TURN_INCHES = 22.25;
+
+    private MecanumDrive mecanumDrive;
 
     public AnimatronicsRobot() {
 
@@ -66,6 +88,7 @@ public class AnimatronicsRobot {
 
         lFoundationMotor = hardwareMap.get(DcMotor.class, "left_foundation");
         rFoundationMotor = hardwareMap.get(DcMotor.class, "right_foundation");
+        stoneServoMotor = hardwareMap.get(Servo.class, "stone_servo");
 
         scissorsTouch = hardwareMap.get(TouchSensor.class, "scissors_touch");
         clawTouch = hardwareMap.get(TouchSensor.class, "claw_touch");
@@ -144,6 +167,9 @@ public class AnimatronicsRobot {
         else if(gamepad1.dpad_down || gamepad2.dpad_down) foundationPower = -1.0f;
         lFoundationMotor.setPower(foundationPower);
         rFoundationMotor.setPower(foundationPower);
+
+        if(gamepad1.dpad_left || gamepad2.dpad_left) stoneServoMotor.setPosition(0.0);
+        else if(gamepad1.dpad_right || gamepad2.dpad_right) stoneServoMotor.setPosition(1.0);
     }
 
     private void setWheelsRunMode(DcMotor.RunMode mode) {
@@ -161,6 +187,21 @@ public class AnimatronicsRobot {
         setWheelsRunMode(DcMotor.RunMode.RUN_USING_ENCODER);
         scissorsLiftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         clawLiftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+        mecanumDrive = new MecanumDrive(leftFrontMotor, rightFrontMotor, leftBackMotor, rightBackMotor);
+    }
+
+
+    public void driveMecanum(double forward, double strafe, double rotate) {
+        mecanumDrive.driveMecanum(forward, strafe, rotate);
+    }
+
+    public void driveMecanumForTime(LinearOpMode opMode, double forward, double strafe, double rotate, double timeoutS) {
+        runtime.reset();
+        while (opMode.opModeIsActive() && (runtime.seconds() < timeoutS)) {
+            mecanumDrive.driveMecanum(forward, strafe, rotate);
+        }
+        stopRobot();
     }
 
     public void timeDrive(LinearOpMode opMode, double leftSpeed, double rightSpeed, double timeoutS) {
@@ -223,21 +264,22 @@ public class AnimatronicsRobot {
         int newLBTarget;
         int newRFTarget;
         int newRBTarget;
+        int lfError = (int)(position * LEFT_FRONT_LATERAL_ERROR_PER_REV);
+        int lbError = (int)(position * LEFT_BACK_LATERAL_ERROR_PER_REV);
+        int rfError = (int)(position * RIGHT_FRONT_LATERAL_ERROR_PER_REV);
+        int rbError = (int)(position * RIGHT_BACK_LATERAL_ERROR_PER_REV);
         if(right) {
-            newLFTarget = leftFrontMotor.getCurrentPosition() + position;
-            newLBTarget = leftBackMotor.getCurrentPosition() - position;
-            newRFTarget = rightFrontMotor.getCurrentPosition() - position;
-            newRBTarget = rightBackMotor.getCurrentPosition() + position;
+            newLFTarget = leftFrontMotor.getCurrentPosition() + position - lfError;
+            newLBTarget = leftBackMotor.getCurrentPosition() - position - lbError;
+            newRFTarget = rightFrontMotor.getCurrentPosition() - position - rfError;
+            newRBTarget = rightBackMotor.getCurrentPosition() + position - rbError;
         } else {
-            newLFTarget = leftFrontMotor.getCurrentPosition() - position;
-            newLBTarget = leftBackMotor.getCurrentPosition() + position;
-            newRFTarget = rightFrontMotor.getCurrentPosition() + position;
-            newRBTarget = rightBackMotor.getCurrentPosition() - position;
+            newLFTarget = leftFrontMotor.getCurrentPosition() - position - lfError;
+            newLBTarget = leftBackMotor.getCurrentPosition() + position - lbError;
+            newRFTarget = rightFrontMotor.getCurrentPosition() + position - rfError;
+            newRBTarget = rightBackMotor.getCurrentPosition() - position - rbError;
         }
-//        System.out.println("*************** ask lf: " + newLFTarget +
-//                ", lb: " + newLBTarget +
-//                ", rf: " + newRFTarget +
-//                ", rb: " + newRBTarget);
+
         leftFrontMotor.setTargetPosition(newLFTarget);
         leftBackMotor.setTargetPosition(newLBTarget);
         rightFrontMotor.setTargetPosition(newRFTarget);
@@ -245,18 +287,15 @@ public class AnimatronicsRobot {
         setWheelsRunMode(DcMotor.RunMode.RUN_TO_POSITION);
 
         runtime.reset();
-        setWheelsSpeed(absSpeed, absSpeed, absSpeed, absSpeed);
+        setWheelsSpeed(absSpeed*LEFT_FRONT_LATERAL_ERROR_POWER, absSpeed*LEFT_BACK_LATERAL_ERROR_POWER,
+                absSpeed*RIGHT_FRONT_LATERAL_ERROR_POWER, absSpeed*RIGHT_BACK_LATERAL_ERROR_POWER);
         while (opMode.opModeIsActive() &&
                 (runtime.seconds() < timeoutS) &&
                 (leftFrontMotor.isBusy() && rightFrontMotor.isBusy() && leftBackMotor.isBusy() && rightBackMotor.isBusy())) {
-            //opMode.idle();
-            try{Thread.sleep(50);}catch(Exception ex){}
+            opMode.idle();
         }
         stopRobot();
-//        System.out.println("*************** act lf: " + leftFrontMotor.getCurrentPosition() +
-//                ", lb: " + leftBackMotor.getCurrentPosition() +
-//                ", rf: " + rightFrontMotor.getCurrentPosition() +
-//                ", rb: " + rightBackMotor.getCurrentPosition());
+
         setWheelsRunMode(DcMotor.RunMode.RUN_USING_ENCODER);
     }
 
@@ -274,11 +313,16 @@ public class AnimatronicsRobot {
         // Ensure that the opmode is still active
         if (opMode.opModeIsActive()) {
 
+            int lfError = (int)(leftPos * LEFT_FRONT_ERROR_PER_REV);
+            int lbError = (int)(leftPos * LEFT_BACK_ERROR_PER_REV);
+            int rfError = (int)(rightPos * RIGHT_FRONT_ERROR_PER_REV);
+            int rbError = (int)(rightPos * RIGHT_BACK_ERROR_PER_REV);
+
             // Determine new target position, and pass to motor controller
-            newLFTarget = leftFrontMotor.getCurrentPosition() + leftPos;
-            newLBTarget = leftBackMotor.getCurrentPosition() + leftPos;
-            newRFTarget = rightFrontMotor.getCurrentPosition() + rightPos;
-            newRBTarget = rightBackMotor.getCurrentPosition() + rightPos;
+            newLFTarget = leftFrontMotor.getCurrentPosition() + leftPos - lfError;
+            newLBTarget = leftBackMotor.getCurrentPosition() + leftPos - lbError;
+            newRFTarget = rightFrontMotor.getCurrentPosition() + rightPos - rfError;
+            newRBTarget = rightBackMotor.getCurrentPosition() + rightPos - rbError;
             leftFrontMotor.setTargetPosition(newLFTarget);
             leftBackMotor.setTargetPosition(newLBTarget);
             rightFrontMotor.setTargetPosition(newRFTarget);
@@ -291,12 +335,10 @@ public class AnimatronicsRobot {
             // reset the timeout time and start motion.
             runtime.reset();
             setWheelsSpeed(absoluteSpeed, absoluteSpeed, absoluteSpeed, absoluteSpeed);
-
             while (opMode.opModeIsActive() &&
                     (runtime.seconds() < timeoutS) &&
                     (leftFrontMotor.isBusy() && rightFrontMotor.isBusy() && leftBackMotor.isBusy() && rightBackMotor.isBusy())) {
-                //opMode.idle();
-                try{Thread.sleep(50);}catch(Exception ex){}
+                opMode.idle();
             }
             stopRobot();
 
@@ -319,7 +361,7 @@ public class AnimatronicsRobot {
         }
     }
 
-    public void clawTimedPower(LinearOpMode opMode, double speed, double timeoutS) {
+    public void clawLiftTimedPower(LinearOpMode opMode, double speed, double timeoutS) {
 
         runtime.reset();
         clawLiftMotor.setPower(speed);
@@ -327,6 +369,10 @@ public class AnimatronicsRobot {
             opMode.idle();
         }
         clawLiftMotor.setPower(0);
+    }
+
+    public void clawLiftSetPower(double speed) {
+        clawLiftMotor.setPower(speed);
     }
 
     public void setScissorsLiftPosition(LinearOpMode opMode, double speed, int targetPosition, double timeoutS) {
@@ -348,6 +394,14 @@ public class AnimatronicsRobot {
         rFoundationMotor.setPower(foundationPower);
     }
 
+    public void setFoundationPower(double foundationPower, boolean isLeft) {
+        if(isLeft) {
+            lFoundationMotor.setPower(foundationPower);
+        } else {
+            rFoundationMotor.setPower(foundationPower);
+        }
+    }
+
     public double getFrontDistance() {
         return frontDistance.getDistance(DistanceUnit.INCH);
     }
@@ -360,15 +414,48 @@ public class AnimatronicsRobot {
         return clawTouch.isPressed();
     }
 
+
+    private int lf = 0, lb = 0, rf = 0, rb = 0;
     public void printMetrics() {
-        System.out.println("lf: " + leftFrontMotor.getCurrentPosition() +
-                        ", lb: " + leftBackMotor.getCurrentPosition() +
-                        ", rf: " + rightFrontMotor.getCurrentPosition() +
-                        ", rb: " + rightBackMotor.getCurrentPosition());
-        System.out.println("lift: " + scissorsLiftMotor.getCurrentPosition() +
+        System.out.println("***************  lf: " + (leftFrontMotor.getCurrentPosition()-lf)/COUNTS_PER_INCH+
+                        ", lb: " + (leftBackMotor.getCurrentPosition()-lb)/COUNTS_PER_INCH +
+                        ", rf: " + (rightFrontMotor.getCurrentPosition()-rf)/COUNTS_PER_INCH +
+                        ", rb: " + (rightBackMotor.getCurrentPosition()-rb)/COUNTS_PER_INCH);
+        lf = leftFrontMotor.getCurrentPosition();
+        lb = leftBackMotor.getCurrentPosition();
+        rf = rightFrontMotor.getCurrentPosition();
+        rb = rightBackMotor.getCurrentPosition();
+        System.out.println("***************  lift: " + scissorsLiftMotor.getCurrentPosition() +
                 ", worm: " + clawLiftMotor.getCurrentPosition());
-        System.out.println("front: " + getFrontDistance() +
+        System.out.println("***************  front: " + getFrontDistance() +
                 ", back: " + getBackDistance());
+    }
+
+    public WheelsPosition getCurrentWheelsPosition() {
+        return new WheelsPosition(leftFrontMotor.getCurrentPosition(),
+                leftBackMotor.getCurrentPosition(),
+                rightFrontMotor.getCurrentPosition(),
+                rightBackMotor.getCurrentPosition());
+    }
+
+    public double distanceTravelled(WheelsPosition start, WheelsPosition end) {
+
+        int lfPos = end.lf - start.lf;
+        int lbPos = end.lb - start.lb;
+        int rfPos = end.rf - start.rf;
+        int rbPos = end.rb - start.rb;
+
+        lfPos += (int)(lfPos * LEFT_FRONT_ERROR_PER_REV);
+        lbPos += (int)(lbPos * LEFT_BACK_ERROR_PER_REV);
+        rfPos += (int)(rfPos * RIGHT_FRONT_ERROR_PER_REV);
+        rbPos += (int)(rbPos * RIGHT_BACK_ERROR_PER_REV);
+
+        double lfDstance = (double)lfPos / COUNTS_PER_INCH;
+        double lbDstance = (double)lbPos / COUNTS_PER_INCH;
+        double rfDstance = (double)rfPos / COUNTS_PER_INCH;
+        double rbDstance = (double)rbPos / COUNTS_PER_INCH;
+
+        return (lfDstance + lbDstance + rfDstance + rbDstance) / 4;
     }
 
     public void idleFor(LinearOpMode opMode, double sec) {
@@ -376,10 +463,6 @@ public class AnimatronicsRobot {
         while (runtime.seconds() < sec) {
             opMode.idle();
         }
-    }
-
-    public ElapsedTime getRunTime() {
-        return this.runtime;
     }
 
     public CRServo getClawRotateMotor() {
@@ -392,5 +475,20 @@ public class AnimatronicsRobot {
 
     public CRServo getClawTwistMotor() {
         return clawTwistMotor;
+    }
+
+    public Servo getStomeServo() {
+        return stoneServoMotor;
+    }
+
+    class WheelsPosition {
+        public int lf, lb, rf, rb;
+
+        public WheelsPosition(int lf, int lb, int rf, int rb) {
+            this.lf = lf;
+            this.lb = lb;
+            this.rf = rf;
+            this.rb = rb;
+        }
     }
 }
