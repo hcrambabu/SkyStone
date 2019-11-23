@@ -12,6 +12,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.VuforiaTrackableDefau
 import org.firstinspires.ftc.robotcore.external.navigation.VuforiaTrackables;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 import static org.firstinspires.ftc.robotcore.external.navigation.AngleUnit.DEGREES;
@@ -56,6 +57,7 @@ public class Navigation {
 
     private VuforiaTrackables targetsSkyStone;
     private List<VuforiaTrackable> allTrackables = new ArrayList<VuforiaTrackable>();
+    private HashMap<String, VuforiaTrackable> trackableHashMap = new HashMap<>();
     private boolean isShutdowned = false;
 
     public void initialize(LinearOpMode opMode) {
@@ -109,6 +111,9 @@ public class Navigation {
 
         // For convenience, gather together all the trackable objects in one easily-iterable collection */
         allTrackables.addAll(targetsSkyStone);
+        for (VuforiaTrackable trackable : allTrackables) {
+            trackableHashMap.put(trackable.getName(), trackable);
+        }
 
         /**
          * In order for localization to work, we need to tell the system where each target is on the field, and
@@ -281,7 +286,7 @@ public class Navigation {
         return currPosition;
     }
 
-    public Position getCameraPositionFromTarget(LinearOpMode opMode) {
+    public Position getCameraPosition(LinearOpMode opMode) {
         Position currPosition = null;
         String name = "";
         OpenGLMatrix vuforiaCameraFromTarget = null;
@@ -338,6 +343,58 @@ public class Navigation {
             opMode.telemetry.update();
         }
         return target;
+    }
+
+    public Position getCameraPositionFromTraget(LinearOpMode opMode, String target) {
+        Position currPosition = null;
+        VuforiaTrackable trackable = trackableHashMap.get(target);
+
+        if(trackable != null){
+            if (((VuforiaTrackableDefaultListener)trackable.getListener()).isVisible()) {
+                OpenGLMatrix vuforiaCameraFromTarget = ((VuforiaTrackableDefaultListener) trackable.getListener()).getVuforiaCameraFromTarget();
+                if (vuforiaCameraFromTarget != null) {
+                    VectorF translation = vuforiaCameraFromTarget.getTranslation();
+                    currPosition = new Position(trackable.getName(), translation.get(0) / mmPerInch, translation.get(1) / mmPerInch, translation.get(2) / mmPerInch);
+
+                    opMode.telemetry.addData("Visible Target", trackable.getName());
+                    opMode.telemetry.addData("Pos (in)", "{X, Y, Z} = %.1f, %.1f, %.1f",
+                            currPosition.X, currPosition.Y, currPosition.Z);
+                }
+            } else {
+                System.out.println("*************** "+ target + " NOT VISIBLE");
+                opMode.telemetry.addData("Visible Target", "none");
+            }
+        } else {
+            System.out.println("*************** "+ target + " NULL");
+            opMode.telemetry.addData("Visible Target", "NULL");
+        }
+        opMode.telemetry.update();
+        return currPosition;
+    }
+
+    public Position getRobotPositionFromTraget(LinearOpMode opMode, String target) {
+        Position currPosition = null;
+        VuforiaTrackable trackable = trackableHashMap.get(target);
+        if(trackable != null) {
+            if(((VuforiaTrackableDefaultListener)trackable.getListener()).isVisible()) {
+                OpenGLMatrix robotLocationTransform = ((VuforiaTrackableDefaultListener) trackable.getListener()).getUpdatedRobotLocation();
+                if (robotLocationTransform != null) {
+                    VectorF translation = robotLocationTransform.getTranslation();
+                    currPosition = new Position(trackable.getName(), translation.get(0) / mmPerInch, translation.get(1) / mmPerInch, translation.get(2) / mmPerInch);
+                    opMode.telemetry.addData("Visible Target", trackable.getName());
+                    opMode.telemetry.addData("Pos (in)", "{X, Y, Z} = %.1f, %.1f, %.1f",
+                            currPosition.X, currPosition.Y, currPosition.Z);
+                }
+            } else {
+                System.out.println("*************** "+ target + " NOT VISIBLE");
+                opMode.telemetry.addData("Visible Target", "none");
+            }
+        } else {
+            System.out.println("*************** "+ target + " NULL");
+            opMode.telemetry.addData("Visible Target", "NULL");
+        }
+        opMode.telemetry.update();
+        return currPosition;
     }
 
     public void shutdown() {
