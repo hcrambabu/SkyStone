@@ -46,13 +46,13 @@ public class AutonomousDrive extends LinearOpMode {
                 System.out.println("*************** main: Position Name: "+ pos.name);
                 startedPosition = pos;
                 // Found Perimeter wall target
-                if(pos.name.equals(Navigation.Target.BLUE_PERIMETER_1)) {
+                if(pos.name.equals(Navigation.Target.BLUE_PERIMETER_1) || (pos.name.equals(Navigation.Target.FRON_PERIMETER_2))) {
                     quarySide(false);
                 } else if(pos.name.equals(Navigation.Target.BLUE_PERIMETER_2) || (pos.name.equals(Navigation.Target.REAR_PERIMETER_1))) {
                     moveFoundation(false);
-                } else if(pos.name.equals(Navigation.Target.RED_PERIMETER_1) || (pos.name.equals(Navigation.Target.FRON_PERIMETER_2))) {
+                } else if(pos.name.equals(Navigation.Target.RED_PERIMETER_2) || (pos.name.equals(Navigation.Target.FRONT_PERIMETER_1))) {
                     quarySide(true);
-                } else if(pos.name.equals(Navigation.Target.RED_PERIMETER_2)) {
+                } else if(pos.name.equals(Navigation.Target.RED_PERIMETER_1) || (pos.name.equals(Navigation.Target.REAR_PERIMETER_2))) {
                     moveFoundation(true);
                 }
             }
@@ -170,7 +170,7 @@ public class AutonomousDrive extends LinearOpMode {
             if(pos != null) {
                 break;
             }
-            robot.encoderInchesDrive(this, 0.5f, 8, 8, 5);
+            robot.encoderInchesDrive(this, 0.5f, turnSign*8, turnSign*8, 5);
             robot.idleFor(this, 0.25f);
         }
         if(pos != null) {
@@ -179,12 +179,12 @@ public class AutonomousDrive extends LinearOpMode {
         AnimatronicsRobot.WheelsPosition endWheelPos = robot.getCurrentWheelsPosition();
         // Turn towards Skystone and go close to it
         robot.encoderInchesDrive(this, 0.75f, -turnInches, turnInches, 4);
-        robot.encoderInchesDrive(this, 0.75f, 4, 4, 5);
+        robot.encoderInchesDrive(this, 0.75f, 6, 6, 5);
         // Down the Claw Lift
         robot.getClawRotateMotor().setPower(-1.0f);
         robot.clawLiftTimedPower(this, 1.0f, 2.5);
         // come back, turn towards building zone and go there to leave stone
-        robot.encoderInchesDrive(this, 0.75f, -4, -4, 5);
+        robot.encoderInchesDrive(this, 0.75f, -6, -6, 5);
         robot.encoderInchesDrive(this, 0.75f, turnSign*-turnInches, turnSign*turnInches, 5);
 
         // Go Back to staring of the stone search
