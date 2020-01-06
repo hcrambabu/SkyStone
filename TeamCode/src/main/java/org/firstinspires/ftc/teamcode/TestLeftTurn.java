@@ -8,13 +8,13 @@ public class TestLeftTurn extends LinearOpMode {
 
     AnimatronicsRobot robot = new AnimatronicsRobot();
     
-    private static double turnInches = AnimatronicsRobot.QUARTER_TURN_INCHES;
+    private static double turnInches = 48;
 
     @Override
     public void runOpMode() throws InterruptedException {
 
         robot.robotInit(hardwareMap, telemetry);
-        robot.enableEncoders();
+        robot.enableEncoders(this);
 
         telemetry.addData(">", "Press Play to start op mode");
         telemetry.update();

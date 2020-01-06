@@ -1,14 +1,18 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.qualcomm.hardware.modernrobotics.ModernRoboticsI2cGyro;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.Gamepad;
+import com.qualcomm.robotcore.hardware.GyroSensor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.TouchSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.Range;
 import com.vuforia.Rectangle;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
@@ -20,49 +24,36 @@ public class AnimatronicsRobot {
     private DcMotor rightFrontMotor;
     private DcMotor leftBackMotor;
     private DcMotor rightBackMotor;
-    private DcMotor scissorsLiftMotor;
-    private CRServo clawHoldingMotor;
-    private CRServo clawTwistMotor;
-    private DcMotor clawLiftMotor;
-    private CRServo clawRotateMotor;
-    private DcMotor lFoundationMotor;
-    private DcMotor rFoundationMotor;
-    private Servo   stoneServoMotor;
+    private DcMotor liftMotor;
 
-    private TouchSensor scissorsTouch;
-    private TouchSensor clawTouch;
-    private DistanceSensor frontDistance;
-    private DistanceSensor backDistance;
+    private DcMotor leftCollector;
+    private DcMotor rightCollector;
+
+    private DcMotor foundationMotor;
+
+    private Servo   clawTwistServo;
+    private CRServo clawServo;
+
+    private DistanceSensor distanceSensor;
+    private ModernRoboticsI2cGyro gyroSensor;
 
     static final double WHEEL_COUNTS_PER_MOTOR_REV = 1120;
-    static final double WHEEL_DRIVE_GEAR_REDUCTION = 1.0;
+    static final double WHEEL_DRIVE_GEAR_REDUCTION = 45.0f/80.0f;
     static final double WHEEL_DIAMETER_INCHES = 4.0;
     static final double COUNTS_PER_INCH = (WHEEL_COUNTS_PER_MOTOR_REV * WHEEL_DRIVE_GEAR_REDUCTION) /
             (WHEEL_DIAMETER_INCHES * 3.1415);
 
+    static final double     HEADING_THRESHOLD       = 1 ;      // As tight as we can make it with an integer gyro
+    static final double     P_TURN_COEFF            = 0.1;     // Larger is more responsive, but also less stable
+    static final double     P_DRIVE_COEFF           = 0.15;     // Larger is more responsive, but also less stable
+
     private ElapsedTime runtime = new ElapsedTime();
 
     private static final double XY_WHEELS_THRESHOLD_POWER = 0.0f;
-    private static final double XY_CLAW_THRESHOLD_POWER = 0.5f;
-
-    private static final double LEFT_FRONT_ERROR_PER_REV = 0.;
-    private static final double LEFT_BACK_ERROR_PER_REV = 0.0;
-    private static final double RIGHT_FRONT_ERROR_PER_REV = 0.0;
-    private static final double RIGHT_BACK_ERROR_PER_REV = 0.0;
-
-    private static final double LEFT_FRONT_LATERAL_ERROR_PER_REV = 0.0;
-    private static final double LEFT_BACK_LATERAL_ERROR_PER_REV = 0.0;
-    private static final double RIGHT_FRONT_LATERAL_ERROR_PER_REV = 0.0;
-    private static final double RIGHT_BACK_LATERAL_ERROR_PER_REV = 0.0;
-
-    private static final double LEFT_FRONT_LATERAL_ERROR_POWER = 1.0;
-    private static final double LEFT_BACK_LATERAL_ERROR_POWER = 1.0;
-    private static final double RIGHT_FRONT_LATERAL_ERROR_POWER = 1.0;
-    private static final double RIGHT_BACK_LATERAL_ERROR_POWER = 1.0;
-
-    public static final double QUARTER_TURN_INCHES = 22.25;
 
     private MecanumDrive mecanumDrive;
+
+    private boolean holdTheStone = false;
 
     public AnimatronicsRobot() {
 
@@ -75,49 +66,42 @@ public class AnimatronicsRobot {
 
         leftFrontMotor = hardwareMap.get(DcMotor.class, "left_drive");
         rightFrontMotor = hardwareMap.get(DcMotor.class, "right_drive");
-        leftBackMotor = hardwareMap.get(DcMotor.class, "left_back");
-        rightBackMotor = hardwareMap.get(DcMotor.class, "right_back");
+        leftBackMotor = hardwareMap.get(DcMotor.class, "leftback_drive");
+        rightBackMotor = hardwareMap.get(DcMotor.class, "rightback_drive");
 
-        scissorsLiftMotor = hardwareMap.get(DcMotor.class, "liftmotor1");
-        clawLiftMotor = hardwareMap.get(DcMotor.class, "clawlift");
+        leftCollector = hardwareMap.get(DcMotor.class, "collect1");
+        rightCollector = hardwareMap.get(DcMotor.class, "collect2");
 
-        clawHoldingMotor = hardwareMap.get(CRServo.class, "clawmotor");
-        clawTwistMotor = hardwareMap.get(CRServo.class, "clawtwist");
+        liftMotor = hardwareMap.get(DcMotor.class, "lift");
+        foundationMotor = hardwareMap.get(DcMotor.class, "foundation");
 
-        clawRotateMotor = hardwareMap.get(CRServo.class, "clawrotate");
+        clawTwistServo = hardwareMap.get(Servo.class, "clawtwist");
+        clawServo = hardwareMap.get(CRServo.class, "claw");
 
-        lFoundationMotor = hardwareMap.get(DcMotor.class, "left_foundation");
-        rFoundationMotor = hardwareMap.get(DcMotor.class, "right_foundation");
-        stoneServoMotor = hardwareMap.get(Servo.class, "stone_servo");
-
-        scissorsTouch = hardwareMap.get(TouchSensor.class, "scissors_touch");
-        clawTouch = hardwareMap.get(TouchSensor.class, "claw_touch");
-        frontDistance = hardwareMap.get(DistanceSensor.class, "front_distance");
-        backDistance = hardwareMap.get(DistanceSensor.class, "back_distance");
+        distanceSensor = hardwareMap.get(DistanceSensor.class, "distance");
+        gyroSensor = (ModernRoboticsI2cGyro)hardwareMap.gyroSensor.get("gyro");
 
         leftFrontMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         leftBackMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightFrontMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightBackMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        scissorsLiftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        clawLiftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        lFoundationMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        rFoundationMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        liftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        //foundationMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+
+        leftCollector.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+        rightCollector.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
 
         leftFrontMotor.setDirection(DcMotor.Direction.FORWARD);
         rightFrontMotor.setDirection(DcMotor.Direction.REVERSE);
         leftBackMotor.setDirection(DcMotor.Direction.FORWARD);
         rightBackMotor.setDirection(DcMotor.Direction.REVERSE);
 
-        scissorsLiftMotor.setDirection(DcMotor.Direction.REVERSE);
+        foundationMotor.setDirection(DcMotor.Direction.REVERSE);
+        liftMotor.setDirection(DcMotor.Direction.FORWARD);
+        clawServo.setDirection(DcMotor.Direction.FORWARD);
 
-        clawHoldingMotor.setDirection(CRServo.Direction.FORWARD);
-        clawTwistMotor.setDirection(CRServo.Direction.FORWARD);
-        clawLiftMotor.setDirection(DcMotor.Direction.FORWARD);
-        clawRotateMotor.setDirection(CRServo.Direction.FORWARD);
-
-        lFoundationMotor.setDirection(DcMotor.Direction.FORWARD);
-        rFoundationMotor.setDirection(DcMotor.Direction.REVERSE);
+        leftCollector.setDirection(DcMotor.Direction.FORWARD);
+        rightCollector.setDirection(DcMotor.Direction.REVERSE);
     }
 
     private void setWheelsSpeed(double leftForwardPower, double leftBackPower,
@@ -141,35 +125,38 @@ public class AnimatronicsRobot {
         double rightForwardPower = -(gp1_rsy + gp1_rsx);
         double rightBackPower = -(gp1_rsy - gp1_rsx);
 
-        double liftPower = gamepad1.left_trigger - gamepad1.right_trigger;
-        double clawliftPower = gamepad2.left_trigger - gamepad2.right_trigger;
-        double clawPower = gamepad2.left_stick_y;
+        setWheelsSpeed(leftForwardPower, leftBackPower, rightForwardPower, rightBackPower);
 
-        double clawrotatePower = 0;
-        if(gamepad2.right_stick_y >= XY_CLAW_THRESHOLD_POWER || gamepad2.right_stick_y <= -XY_CLAW_THRESHOLD_POWER) clawrotatePower = gamepad2.right_stick_y;
-        double clawtwistPower = 0;
-        if(gamepad2.right_stick_x >= XY_CLAW_THRESHOLD_POWER || gamepad2.right_stick_x <= -XY_CLAW_THRESHOLD_POWER) clawtwistPower = gamepad2.right_stick_x;
-
-        if(liftPower < 0 && scissorsTouch.isPressed()) { // Already reached to end.
-            liftPower = 0;
+        if(gamepad2.x) {
+            clawTwistServo.setPosition(0.0f);
+        } else if(gamepad2.y) {
+            clawTwistServo.setPosition(1.0f);
         }
 
-        // Send calculated power to wheels
-        setWheelsSpeed(leftForwardPower, leftBackPower, rightForwardPower, rightBackPower);
-        scissorsLiftMotor.setPower(liftPower);
-        clawLiftMotor.setPower(clawliftPower);
-        clawHoldingMotor.setPower(clawPower);
-        clawRotateMotor.setPower(clawrotatePower);
-        clawTwistMotor.setPower(clawtwistPower);
+        if(gamepad2.a) holdTheStone = true;
+        if(gamepad2.b) holdTheStone = false;
 
-        double foundationPower = 0;
-        if(gamepad1.dpad_up || gamepad2.dpad_up) foundationPower = 1.0f;
-        else if(gamepad1.dpad_down || gamepad2.dpad_down) foundationPower = -1.0f;
-        lFoundationMotor.setPower(foundationPower);
-        rFoundationMotor.setPower(foundationPower);
+        if(holdTheStone) {
+            clawServo.setPower(1.0f);
+        } else {
+            clawServo.setPower(-1.0f);
+        }
 
-        if(gamepad1.dpad_left || gamepad2.dpad_left) stoneServoMotor.setPosition(0.0);
-        else if(gamepad1.dpad_right || gamepad2.dpad_right) stoneServoMotor.setPosition(1.0);
+        double liftPower = gamepad1.left_trigger - gamepad1.right_trigger;
+        liftMotor.setPower(liftPower);
+
+        if(gamepad1.dpad_up || gamepad2.dpad_up){
+            foundationMotor.setPower(1.0f);
+        }
+        else if(gamepad1.dpad_down || gamepad2.dpad_down) {
+            foundationMotor.setPower(-1.0f);
+        } else if(gamepad1.dpad_left || gamepad1.dpad_right || gamepad2.dpad_left || gamepad2.dpad_right) {
+            foundationMotor.setPower(0.0f);
+        }
+
+        double collectporPower = gamepad2.left_trigger - gamepad2.right_trigger;
+        leftCollector.setPower(collectporPower);
+        rightCollector.setPower(collectporPower);
     }
 
     private void setWheelsRunMode(DcMotor.RunMode mode) {
@@ -179,16 +166,22 @@ public class AnimatronicsRobot {
         rightBackMotor.setMode(mode);
     }
 
-    public void enableEncoders() {
+    public void enableEncoders(LinearOpMode opMode) throws InterruptedException {
         setWheelsRunMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        scissorsLiftMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        clawLiftMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        liftMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
 
         setWheelsRunMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        scissorsLiftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        clawLiftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        liftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
-        mecanumDrive = new MecanumDrive(leftFrontMotor, rightFrontMotor, leftBackMotor, rightBackMotor);
+        gyroSensor.calibrate();
+
+        // make sure the gyro is calibrated before continuing
+        while (!opMode.isStopRequested() && gyroSensor.isCalibrating())  {
+            Thread.sleep(50);
+            opMode.idle();
+        }
+        gyroSensor.resetZAxisIntegrator();
+        mecanumDrive = new MecanumDrive(leftFrontMotor, rightFrontMotor, leftBackMotor, rightBackMotor, gyroSensor);
     }
 
 
@@ -264,20 +257,17 @@ public class AnimatronicsRobot {
         int newLBTarget;
         int newRFTarget;
         int newRBTarget;
-        int lfError = (int)(position * LEFT_FRONT_LATERAL_ERROR_PER_REV);
-        int lbError = (int)(position * LEFT_BACK_LATERAL_ERROR_PER_REV);
-        int rfError = (int)(position * RIGHT_FRONT_LATERAL_ERROR_PER_REV);
-        int rbError = (int)(position * RIGHT_BACK_LATERAL_ERROR_PER_REV);
+
         if(right) {
-            newLFTarget = leftFrontMotor.getCurrentPosition() + position - lfError;
-            newLBTarget = leftBackMotor.getCurrentPosition() - position - lbError;
-            newRFTarget = rightFrontMotor.getCurrentPosition() - position - rfError;
-            newRBTarget = rightBackMotor.getCurrentPosition() + position - rbError;
+            newLFTarget = leftFrontMotor.getCurrentPosition() + position;
+            newLBTarget = leftBackMotor.getCurrentPosition() - position;
+            newRFTarget = rightFrontMotor.getCurrentPosition() - position;
+            newRBTarget = rightBackMotor.getCurrentPosition() + position;
         } else {
-            newLFTarget = leftFrontMotor.getCurrentPosition() - position - lfError;
-            newLBTarget = leftBackMotor.getCurrentPosition() + position - lbError;
-            newRFTarget = rightFrontMotor.getCurrentPosition() + position - rfError;
-            newRBTarget = rightBackMotor.getCurrentPosition() - position - rbError;
+            newLFTarget = leftFrontMotor.getCurrentPosition() - position ;
+            newLBTarget = leftBackMotor.getCurrentPosition() + position;
+            newRFTarget = rightFrontMotor.getCurrentPosition() + position;
+            newRBTarget = rightBackMotor.getCurrentPosition() - position;
         }
 
         leftFrontMotor.setTargetPosition(newLFTarget);
@@ -287,8 +277,7 @@ public class AnimatronicsRobot {
         setWheelsRunMode(DcMotor.RunMode.RUN_TO_POSITION);
 
         runtime.reset();
-        setWheelsSpeed(absSpeed*LEFT_FRONT_LATERAL_ERROR_POWER, absSpeed*LEFT_BACK_LATERAL_ERROR_POWER,
-                absSpeed*RIGHT_FRONT_LATERAL_ERROR_POWER, absSpeed*RIGHT_BACK_LATERAL_ERROR_POWER);
+        setWheelsSpeed(absSpeed, absSpeed, absSpeed, absSpeed);
         while (opMode.opModeIsActive() &&
                 (runtime.seconds() < timeoutS) &&
                 (leftFrontMotor.isBusy() && rightFrontMotor.isBusy() && leftBackMotor.isBusy() && rightBackMotor.isBusy())) {
@@ -313,16 +302,11 @@ public class AnimatronicsRobot {
         // Ensure that the opmode is still active
         if (opMode.opModeIsActive()) {
 
-            int lfError = (int)(leftPos * LEFT_FRONT_ERROR_PER_REV);
-            int lbError = (int)(leftPos * LEFT_BACK_ERROR_PER_REV);
-            int rfError = (int)(rightPos * RIGHT_FRONT_ERROR_PER_REV);
-            int rbError = (int)(rightPos * RIGHT_BACK_ERROR_PER_REV);
-
             // Determine new target position, and pass to motor controller
-            newLFTarget = leftFrontMotor.getCurrentPosition() + leftPos - lfError;
-            newLBTarget = leftBackMotor.getCurrentPosition() + leftPos - lbError;
-            newRFTarget = rightFrontMotor.getCurrentPosition() + rightPos - rfError;
-            newRBTarget = rightBackMotor.getCurrentPosition() + rightPos - rbError;
+            newLFTarget = leftFrontMotor.getCurrentPosition() + leftPos;
+            newLBTarget = leftBackMotor.getCurrentPosition() + leftPos;
+            newRFTarget = rightFrontMotor.getCurrentPosition() + rightPos;
+            newRBTarget = rightBackMotor.getCurrentPosition() + rightPos;
             leftFrontMotor.setTargetPosition(newLFTarget);
             leftBackMotor.setTargetPosition(newLBTarget);
             rightFrontMotor.setTargetPosition(newRFTarget);
@@ -347,71 +331,22 @@ public class AnimatronicsRobot {
         }
     }
 
-    public void setClawLiftPosition(LinearOpMode opMode, double speed, int targetPosition, double timeoutS) {
+    public void setLiftPosition(LinearOpMode opMode, double speed, int targetPosition, double timeoutS) {
         if (opMode.opModeIsActive()) {
-            clawLiftMotor.setTargetPosition(targetPosition);
-            clawLiftMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            liftMotor.setTargetPosition(targetPosition);
+            liftMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
             runtime.reset();
-            clawLiftMotor.setPower(Math.abs(speed));
-            while (opMode.opModeIsActive() && clawLiftMotor.isBusy() && (runtime.seconds() < timeoutS)) {
+            liftMotor.setPower(Math.abs(speed));
+            while (opMode.opModeIsActive() && liftMotor.isBusy() && (runtime.seconds() < timeoutS)) {
                 opMode.idle();
             }
-            clawLiftMotor.setPower(0);
-            clawLiftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        }
-    }
-
-    public void clawLiftTimedPower(LinearOpMode opMode, double speed, double timeoutS) {
-
-        runtime.reset();
-        clawLiftMotor.setPower(speed);
-        while (opMode.opModeIsActive() && (runtime.seconds() < timeoutS)) {
-            opMode.idle();
-        }
-        clawLiftMotor.setPower(0);
-    }
-
-    public void clawLiftSetPower(double speed) {
-        clawLiftMotor.setPower(speed);
-    }
-
-    public void setScissorsLiftPosition(LinearOpMode opMode, double speed, int targetPosition, double timeoutS) {
-        if (opMode.opModeIsActive()) {
-            scissorsLiftMotor.setTargetPosition(targetPosition);
-            scissorsLiftMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-            runtime.reset();
-            scissorsLiftMotor.setPower(Math.abs(speed));
-            while (opMode.opModeIsActive() && scissorsLiftMotor.isBusy() && (runtime.seconds() < timeoutS)) {
-                opMode.idle();
-            }
-            scissorsLiftMotor.setPower(0);
-            scissorsLiftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            liftMotor.setPower(0);
+            liftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         }
     }
 
     public void setFoundationPower(double foundationPower) {
-        lFoundationMotor.setPower(foundationPower);
-        rFoundationMotor.setPower(foundationPower);
-    }
-
-    public void setFoundationPower(double foundationPower, boolean isLeft) {
-        if(isLeft) {
-            lFoundationMotor.setPower(foundationPower);
-        } else {
-            rFoundationMotor.setPower(foundationPower);
-        }
-    }
-
-    public double getFrontDistance() {
-        return frontDistance.getDistance(DistanceUnit.INCH);
-    }
-
-    public double getBackDistance() {
-        return backDistance.getDistance(DistanceUnit.INCH);
-    }
-
-    public boolean isClawTouchPressed() {
-        return clawTouch.isPressed();
+        foundationMotor.setPower(foundationPower);
     }
 
 
@@ -425,10 +360,7 @@ public class AnimatronicsRobot {
         lb = leftBackMotor.getCurrentPosition();
         rf = rightFrontMotor.getCurrentPosition();
         rb = rightBackMotor.getCurrentPosition();
-        System.out.println("***************  lift: " + scissorsLiftMotor.getCurrentPosition() +
-                ", worm: " + clawLiftMotor.getCurrentPosition());
-        System.out.println("***************  front: " + getFrontDistance() +
-                ", back: " + getBackDistance());
+        System.out.println("***************  lift: " + liftMotor.getCurrentPosition());
     }
 
     public WheelsPosition getCurrentWheelsPosition() {
@@ -445,11 +377,6 @@ public class AnimatronicsRobot {
         int rfPos = end.rf - start.rf;
         int rbPos = end.rb - start.rb;
 
-        lfPos += (int)(lfPos * LEFT_FRONT_ERROR_PER_REV);
-        lbPos += (int)(lbPos * LEFT_BACK_ERROR_PER_REV);
-        rfPos += (int)(rfPos * RIGHT_FRONT_ERROR_PER_REV);
-        rbPos += (int)(rbPos * RIGHT_BACK_ERROR_PER_REV);
-
         double lfDstance = (double)lfPos / COUNTS_PER_INCH;
         double lbDstance = (double)lbPos / COUNTS_PER_INCH;
         double rfDstance = (double)rfPos / COUNTS_PER_INCH;
@@ -460,25 +387,12 @@ public class AnimatronicsRobot {
 
     public void idleFor(LinearOpMode opMode, double sec) {
         runtime.reset();
-        while (runtime.seconds() < sec) {
-            opMode.idle();
-        }
-    }
-
-    public CRServo getClawRotateMotor() {
-        return clawRotateMotor;
-    }
-
-    public CRServo getClawHoldingMotor() {
-        return clawHoldingMotor;
-    }
-
-    public CRServo getClawTwistMotor() {
-        return clawTwistMotor;
-    }
-
-    public Servo getStomeServo() {
-        return stoneServoMotor;
+        try {
+            while (runtime.seconds() < sec) {
+                //opMode.idle();
+                Thread.sleep(50);
+            }
+        } catch (InterruptedException ex){}
     }
 
     class WheelsPosition {
@@ -490,5 +404,234 @@ public class AnimatronicsRobot {
             this.rf = rf;
             this.rb = rb;
         }
+    }
+
+    /**
+     *  Method to drive on a fixed compass bearing (angle), based on encoder counts.
+     *  Move will stop if either of these conditions occur:
+     *  1) Move gets to the desired position
+     *  2) Driver stops the opmode running.
+     *
+     * @param speed      Target speed for forward motion.  Should allow for _/- variance for adjusting heading
+     * @param distance   Distance (in inches) to move from current position.  Negative distance means move backwards.
+     * @param angle      Absolute Angle (in Degrees) relative to last gyro reset.
+     *                   0 = fwd. +ve is CCW from fwd. -ve is CW from forward.
+     *                   If a relative angle is required, add/subtract from current heading.
+     */
+    public void gyroDrive ( LinearOpMode opMode,
+                            double speed,
+                            double distance,
+                            double angle) {
+
+        int     newLF, newLB, newRF, newRB;
+        int     moveCounts;
+        double  max;
+        double  error;
+        double  steer;
+        double  leftSpeed;
+        double  rightSpeed;
+
+        // Ensure that the opmode is still active
+        if (opMode.opModeIsActive()) {
+
+            // Determine new target position, and pass to motor controller
+            moveCounts = (int)(distance * COUNTS_PER_INCH);
+            newLF = leftFrontMotor.getCurrentPosition() + moveCounts;
+            newLB = leftBackMotor.getCurrentPosition() + moveCounts;
+            newRF = rightFrontMotor.getCurrentPosition() + moveCounts;
+            newRB = rightBackMotor.getCurrentPosition() + moveCounts;
+
+            // Set Target and Turn On RUN_TO_POSITION
+            leftFrontMotor.setTargetPosition(newLF);
+            leftBackMotor.setTargetPosition(newLB);
+            rightFrontMotor.setTargetPosition(newRF);
+            rightBackMotor.setTargetPosition(newRB);
+
+            setWheelsRunMode(DcMotor.RunMode.RUN_TO_POSITION);
+
+            // start motion.
+            speed = Range.clip(Math.abs(speed), 0.0, 1.0);
+            setWheelsSpeed(speed, speed, speed, speed);
+
+            // keep looping while we are still active, and BOTH motors are running.
+            while (opMode.opModeIsActive() &&
+                    (leftFrontMotor.isBusy() && rightFrontMotor.isBusy() && leftBackMotor.isBusy() && rightBackMotor.isBusy())) {
+
+                // adjust relative speed based on heading error.
+                error = getError(angle);
+                steer = getSteer(error, P_DRIVE_COEFF);
+
+                // if driving in reverse, the motor correction also needs to be reversed
+                if (distance < 0)
+                    steer *= -1.0;
+
+                leftSpeed = speed - steer;
+                rightSpeed = speed + steer;
+
+                // Normalize speeds if either one exceeds +/- 1.0;
+                max = Math.max(Math.abs(leftSpeed), Math.abs(rightSpeed));
+                if (max > 1.0)
+                {
+                    leftSpeed /= max;
+                    rightSpeed /= max;
+                }
+
+                leftFrontMotor.setPower(leftSpeed);
+                leftBackMotor.setPower(leftSpeed);
+                rightFrontMotor.setPower(rightSpeed);
+                rightBackMotor.setPower(rightSpeed);
+
+                // Display drive status for the driver.
+//                telemetry.addData("Err/St",  "%5.1f/%5.1f",  error, steer);
+//                telemetry.addData("Target",  "%7d:%7d",      newLeftTarget,  newRightTarget);
+//                telemetry.addData("Actual",  "%7d:%7d",      robot.leftDrive.getCurrentPosition(),
+//                        robot.rightDrive.getCurrentPosition());
+//                telemetry.addData("Speed",   "%5.2f:%5.2f",  leftSpeed, rightSpeed);
+//                telemetry.update();
+            }
+
+            // Stop all motion;
+            stopRobot();
+
+            // Turn off RUN_TO_POSITION
+            setWheelsRunMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        }
+    }
+
+    /**
+     *  Method to spin on central axis to point in a new direction.
+     *  Move will stop if either of these conditions occur:
+     *  1) Move gets to the heading (angle)
+     *  2) Driver stops the opmode running.
+     *
+     * @param speed Desired speed of turn.
+     * @param angle      Absolute Angle (in Degrees) relative to last gyro reset.
+     *                   0 = fwd. +ve is CCW from fwd. -ve is CW from forward.
+     *                   If a relative angle is required, add/subtract from current heading.
+     */
+    public void gyroTurn ( LinearOpMode opMode, double speed, double angle) {
+
+        // keep looping while we are still active, and not on heading.
+        while (opMode.opModeIsActive() && !onHeading(speed, angle, P_TURN_COEFF)) {
+            // Update telemetry & Allow time for other processes to run.
+            //telemetry.update();
+            opMode.idle();
+        }
+    }
+
+    /**
+     *  Method to obtain & hold a heading for a finite amount of time
+     *  Move will stop once the requested time has elapsed
+     *
+     * @param speed      Desired speed of turn.
+     * @param angle      Absolute Angle (in Degrees) relative to last gyro reset.
+     *                   0 = fwd. +ve is CCW from fwd. -ve is CW from forward.
+     *                   If a relative angle is required, add/subtract from current heading.
+     * @param holdTime   Length of time (in seconds) to hold the specified heading.
+     */
+    public void gyroHold( LinearOpMode opMode, double speed, double angle, double holdTime) {
+
+        ElapsedTime holdTimer = new ElapsedTime();
+
+        // keep looping while we have time remaining.
+        holdTimer.reset();
+        while (opMode.opModeIsActive() && (holdTimer.time() < holdTime)) {
+            // Update telemetry & Allow time for other processes to run.
+            onHeading(speed, angle, P_TURN_COEFF);
+            //telemetry.update();
+        }
+
+        // Stop all motion;
+        stopRobot();
+    }
+
+    /**
+     * Perform one cycle of closed loop heading control.
+     *
+     * @param speed     Desired speed of turn.
+     * @param angle     Absolute Angle (in Degrees) relative to last gyro reset.
+     *                  0 = fwd. +ve is CCW from fwd. -ve is CW from forward.
+     *                  If a relative angle is required, add/subtract from current heading.
+     * @param PCoeff    Proportional Gain coefficient
+     * @return
+     */
+    boolean onHeading(double speed, double angle, double PCoeff) {
+        double   error ;
+        double   steer ;
+        boolean  onTarget = false ;
+        double leftSpeed;
+        double rightSpeed;
+
+        // determine turn power based on +/- error
+        error = getError(angle);
+
+        if (Math.abs(error) <= HEADING_THRESHOLD) {
+            steer = 0.0;
+            leftSpeed  = 0.0;
+            rightSpeed = 0.0;
+            onTarget = true;
+        }
+        else {
+            steer = getSteer(error, PCoeff);
+            rightSpeed  = speed * steer;
+            leftSpeed   = -rightSpeed;
+        }
+
+        // Send desired speeds to motors.
+        leftFrontMotor.setPower(leftSpeed);
+        leftBackMotor.setPower(leftSpeed);
+        rightFrontMotor.setPower(rightSpeed);
+        rightBackMotor.setPower(rightSpeed);
+
+        // Display it for the driver.
+//        telemetry.addData("Target", "%5.2f", angle);
+//        telemetry.addData("Err/St", "%5.2f/%5.2f", error, steer);
+//        telemetry.addData("Speed.", "%5.2f:%5.2f", leftSpeed, rightSpeed);
+
+        return onTarget;
+    }
+
+    /**
+     * getError determines the error between the target angle and the robot's current heading
+     * @param   targetAngle  Desired angle (relative to global reference established at last Gyro Reset).
+     * @return  error angle: Degrees in the range +/- 180. Centered on the robot's frame of reference
+     *          +ve error means the robot should turn LEFT (CCW) to reduce error.
+     */
+    public double getError(double targetAngle) {
+
+        double robotError;
+
+        // calculate error in -179 to +180 range  (
+        robotError = targetAngle - gyroSensor.getIntegratedZValue();
+        System.out.println("*************** getError: robotError:"+ robotError + ", robotAngle:"+gyroSensor.getIntegratedZValue());
+        while (robotError > 180)  robotError -= 360;
+        while (robotError <= -180) robotError += 360;
+        return robotError;
+    }
+
+    /**
+     * returns desired steering force.  +/- 1 range.  +ve = steer left
+     * @param error   Error angle in robot relative degrees
+     * @param PCoeff  Proportional Gain Coefficient
+     * @return
+     */
+    public double getSteer(double error, double PCoeff) {
+        return Range.clip(error * PCoeff, -1, 1);
+    }
+
+
+    public void startStoneIntake() {
+        leftCollector.setPower(-0.7f);
+        rightCollector.setPower(-0.7f);
+    }
+
+    public void stopStoneIntake() {
+        leftCollector.setPower(0.0f);
+        rightCollector.setPower(0.0f);
+    }
+
+    public boolean isStoneCollected() {
+        System.out.println("*************** isStoneCollected: distance:"+ distanceSensor.getDistance(DistanceUnit.INCH));
+        return distanceSensor.getDistance(DistanceUnit.INCH) < 2.0f;
     }
 }

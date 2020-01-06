@@ -12,7 +12,7 @@ public class TestRightLateral extends LinearOpMode {
     public void runOpMode() throws InterruptedException {
 
         robot.robotInit(hardwareMap, telemetry);
-        robot.enableEncoders();
+        robot.enableEncoders(this);
 
         telemetry.addData(">", "Press Play to start op mode");
         telemetry.update();
