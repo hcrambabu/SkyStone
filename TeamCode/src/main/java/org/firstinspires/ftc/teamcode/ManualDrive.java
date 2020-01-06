@@ -11,7 +11,6 @@ public class ManualDrive extends LinearOpMode {
     @Override
     public void runOpMode() throws InterruptedException {
         robot.robotInit(hardwareMap, telemetry);
-        robot.enableEncoders();
         telemetry.addData(">", "Press Play to start op mode");
         telemetry.update();
         waitForStart();

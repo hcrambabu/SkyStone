@@ -11,16 +11,15 @@ public class AutonomousDrive extends LinearOpMode {
 
     AnimatronicsRobot robot = new AnimatronicsRobot();
     Navigation navigation = new Navigation();
-    String robotStartPosition;
     Navigation.Position startedPosition;
     private ElapsedTime runtime = new ElapsedTime();
-    private static double turnInches = AnimatronicsRobot.QUARTER_TURN_INCHES;
+    private static double turnInches = 48;
 
     @Override
     public void runOpMode() throws InterruptedException {
 
         robot.robotInit(hardwareMap, telemetry);
-        robot.enableEncoders();
+        robot.enableEncoders(this);
         navigation.initialize(this);
 
         telemetry.addData(">", "Press Play to start op mode");
@@ -31,30 +30,31 @@ public class AutonomousDrive extends LinearOpMode {
         telemetry.update();
 
         if (opModeIsActive()) {
+            System.out.println("*************** main: started Autonomous....");
+            robot.gyroDrive(this, 0.7f, -6, 0);
+            robot.idleFor(this, 0.25f); // Give some time for vuforia to find target
+            System.out.println("*************** main: completed 1st turn in Autonomous....");
 
-            // Move forward 2 feet
-            robot.encoderInchesDrive(this, 0.75f, 20, 20, 5);
-            //robot.printMetrics();robot.idleFor(this, 5);
-            // Turn Left camera towards wall
-            robot.encoderInchesDrive(this, 0.75f, -turnInches, turnInches, 5);
-            //robot.printMetrics();robot.idleFor(this, 5);
-            robot.idleFor(this, 0.15f); // Give some time for vuforia to find target
-            // Find where is the Robot
-            Navigation.Position pos = navigation.getRobotPosition(this);
-            System.out.println("*************** main: Position: "+ pos);
-            if(pos != null) {
-                System.out.println("*************** main: Position Name: "+ pos.name);
-                startedPosition = pos;
-                // Found Perimeter wall target
-                if(pos.name.equals(Navigation.Target.BLUE_PERIMETER_1) || (pos.name.equals(Navigation.Target.FRON_PERIMETER_2))) {
-                    quarySide(false);
-                } else if(pos.name.equals(Navigation.Target.BLUE_PERIMETER_2) || (pos.name.equals(Navigation.Target.REAR_PERIMETER_1))) {
-                    moveFoundation(false);
-                } else if(pos.name.equals(Navigation.Target.RED_PERIMETER_2) || (pos.name.equals(Navigation.Target.FRONT_PERIMETER_1))) {
-                    quarySide(true);
-                } else if(pos.name.equals(Navigation.Target.RED_PERIMETER_1) || (pos.name.equals(Navigation.Target.REAR_PERIMETER_2))) {
-                    moveFoundation(true);
+            while(opModeIsActive()) {
+                // Find where is the Robot
+                Navigation.Position pos = navigation.getRobotPosition(this);
+                System.out.println("*************** main: Position: " + pos);
+                if (pos != null) {
+                    System.out.println("*************** main: Position Name: " + pos.name);
+                    startedPosition = pos;
+                    // Found Perimeter wall target
+                    if (pos.name.equals(Navigation.Target.BLUE_PERIMETER_1) || (pos.name.equals(Navigation.Target.FRON_PERIMETER_2))) {
+                        quarySide(false);
+                    } else if (pos.name.equals(Navigation.Target.BLUE_PERIMETER_2) || (pos.name.equals(Navigation.Target.REAR_PERIMETER_1))) {
+                        //moveFoundation(false);
+                    } else if (pos.name.equals(Navigation.Target.RED_PERIMETER_2) || (pos.name.equals(Navigation.Target.FRONT_PERIMETER_1))) {
+                        quarySide(true);
+                    } else if (pos.name.equals(Navigation.Target.RED_PERIMETER_1) || (pos.name.equals(Navigation.Target.REAR_PERIMETER_2))) {
+                        //moveFoundation(true);
+                    }
+                    break;
                 }
+                robot.idleFor(this, 0.25f);
             }
         }
 
@@ -127,14 +127,13 @@ public class AutonomousDrive extends LinearOpMode {
     private void quarySide(boolean isRed) {
         int turnSign = isRed? -1: 1;
 
-        //robot.encoderInchesDrive(this, 0.75f, turnInches, -turnInches, 5);
-        //robot.encoderInchesDrive(this, 0.75f, -8, -8, 5);
-        //robot.encoderInchesDrive(this, 0.75f, -turnInches, turnInches, 5);
+        //robot.gyroDrive(this, 0.7f, -6, 0);
+        // Turn towards stones
+        robot.gyroTurn(this, 0.5f, 170.0f);
+        //robot.lateralEncodeInchesDrive(this, turnSign*-1.0f, 24, 5);
+        robot.driveMecanumForTime(this, 0.0, turnSign*-1.0, 0.0, 0.5);
+        robot.gyroTurn(this, 0.5f, 170.0f);
 
-        // Mostly found the BLUE_PERIMETER_1, go close to bridge until first stone places
-        robot.encoderInchesDrive(this, 0.75f, turnSign*12, turnSign*12, 5);
-        // Turn 180 degrees to face camera towards stones
-        robot.encoderInchesDrive(this, 0.75f, turnSign*turnInches*2, turnSign*-turnInches*2, 5);
         // Search for 1st skystone
         searchSkystone(isRed);
 /* No time for 2nd stone.... so go and park
@@ -151,50 +150,39 @@ public class AutonomousDrive extends LinearOpMode {
         searchSkystone(isRed);
 
 */        // Goto Line
-        robot.encoderInchesDrive(this, 1.0f, -18, -18, 5);
+ //       robot.encoderInchesDrive(this, 1.0f, -18, -18, 5);
     }
 
     private void searchSkystone(boolean isRed) {
         int turnSign = isRed? -1: 1;
 
-        AnimatronicsRobot.WheelsPosition startWheelPos = robot.getCurrentWheelsPosition();
         robot.idleFor(this, 0.25f);
         Navigation.Position pos = null;
-//        runtime.reset();
-//        while(pos == null && (runtime.seconds() < 6)) { //|| pos.X < -1.0f || pos.X > 1.0f
-//            robot.noTimeDrive(turnSign*0.2f, turnSign*0.2f);
-//            pos = navigation.getCameraPositionFromTraget(this, Navigation.Target.STONE_TARGET);
-//        }
-        for(int i = 0; i < 5; i++) {
+        for(int i = 0; i < 10; i++) {
             pos = navigation.getCameraPositionFromTraget(this, Navigation.Target.STONE_TARGET);
             if(pos != null) {
                 break;
             }
-            robot.encoderInchesDrive(this, 0.5f, turnSign*8, turnSign*8, 5);
+            //robot.lateralEncodeInchesDrive(this, turnSign*1.0f, 12, 5);
+            robot.driveMecanumForTime(this, 0.0, turnSign*1.0, 0.0, 0.25f);
+            robot.gyroTurn(this, 0.5f, 180.0f);
             robot.idleFor(this, 0.25f);
         }
+
         if(pos != null) {
-            System.out.println(String.format("*************** searchBlueSkystone: Position Name:%s, X:%.1f, Y:%.1f, Z:%.1f, ", pos.name, pos.X, pos.Y, pos.Z));
+            System.out.println(String.format("*************** searchSkystone: Position Name:%s, X:%.1f, Y:%.1f, Z:%.1f, ", pos.name, pos.X, pos.Y, pos.Z));
+
+            runtime.reset();
+            robot.startStoneIntake();
+            robot.driveMecanum(0.5, 0.0f, 0.0f);
+            while(opModeIsActive() && runtime.seconds() < 5 && !robot.isStoneCollected()) {
+                idle();
+            }
+            robot.stopRobot();
+            robot.stopStoneIntake();
+        } else {
+            System.out.println("*************** searchSkystone: Nothing found.....");
         }
-        AnimatronicsRobot.WheelsPosition endWheelPos = robot.getCurrentWheelsPosition();
-        // Turn towards Skystone and go close to it
-        robot.encoderInchesDrive(this, 0.75f, -turnInches, turnInches, 4);
-        robot.encoderInchesDrive(this, 0.75f, 6, 6, 5);
-        // Down the Claw Lift
-        robot.getClawRotateMotor().setPower(-1.0f);
-        robot.clawLiftTimedPower(this, 1.0f, 2.5);
-        // come back, turn towards building zone and go there to leave stone
-        robot.encoderInchesDrive(this, 0.75f, -6, -6, 5);
-        robot.encoderInchesDrive(this, 0.75f, turnSign*-turnInches, turnSign*turnInches, 5);
-
-        // Go Back to staring of the stone search
-        double distanceTravveledToFGindStone = robot.distanceTravelled(endWheelPos, startWheelPos);
-        distanceTravveledToFGindStone = Math.abs(distanceTravveledToFGindStone);
-        robot.encoderInchesDrive(this, 0.75f, distanceTravveledToFGindStone, distanceTravveledToFGindStone, 5);
-
-        // Cross the bridge
-        robot.encoderInchesDrive(this, 0.75f, 36, 36, 5);
-        // Leave the stone up the claw lift
-        robot.clawLiftTimedPower(this, -1.0f, 1.1);
     }
+
 }
