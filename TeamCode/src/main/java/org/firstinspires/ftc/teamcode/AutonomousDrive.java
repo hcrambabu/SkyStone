@@ -14,6 +14,7 @@ public class AutonomousDrive extends LinearOpMode {
     Navigation.Position startedPosition;
     private ElapsedTime runtime = new ElapsedTime();
     private static double turnInches = 48;
+
     private static double GYRO_ERROR = (168.0 - 180.0)/180.0;
     private static double GYRO_90 = 90.0 + (90.0 * GYRO_ERROR);
     private static double GYRO_180 = 180.0 + (180.0 * GYRO_ERROR);

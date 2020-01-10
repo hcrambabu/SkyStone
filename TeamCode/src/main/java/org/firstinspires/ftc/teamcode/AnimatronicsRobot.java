@@ -49,7 +49,6 @@ public class AnimatronicsRobot {
     static final double LIFT_COUNTS_PER_INCH = (LIFT_COUNTS_PER_MOTOR_REV * LIFT_DRIVE_GEAR_REDUCTION) /
             (LIFT_DIAMETER_INCHES * 4);
 
-
     static final double     HEADING_THRESHOLD       = 1 ;      // As tight as we can make it with an integer gyro
     static final double     P_TURN_COEFF            = 0.1;     // Larger is more responsive, but also less stable
     static final double     P_DRIVE_COEFF           = 0.15;     // Larger is more responsive, but also less stable
@@ -367,7 +366,6 @@ public class AnimatronicsRobot {
         foundationMotor.setPower(foundationPower);
     }
 
-
     private int lf = 0, lb = 0, rf = 0, rb = 0, lp = 0;
     public void printMetrics() {
         System.out.println("***************  lf: " + (leftFrontMotor.getCurrentPosition()-lf)/COUNTS_PER_INCH+
@@ -643,7 +641,6 @@ public class AnimatronicsRobot {
     public int getRobotAngle() {
         return gyroSensor.getIntegratedZValue();
     }
-
 
     public void startStoneIntake() {
         leftCollector.setPower(-0.7f);
