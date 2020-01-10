@@ -14,6 +14,15 @@ public class AutonomousDrive extends LinearOpMode {
     Navigation.Position startedPosition;
     private ElapsedTime runtime = new ElapsedTime();
     private static double turnInches = 48;
+    private static double GYRO_ERROR = (168.0 - 180.0)/180.0;
+    private static double GYRO_90 = 90.0 + (90.0 * GYRO_ERROR);
+    private static double GYRO_180 = 180.0 + (180.0 * GYRO_ERROR);
+    private static double GYRO_270 = 270.0 + (270.0 * GYRO_ERROR);
+    private static double GYRO_360 = 360.0 + (360.0 * GYRO_ERROR);
+
+    private static double GYRO_355 = 355.0 + (355.0 * GYRO_ERROR);
+
+    private static boolean isPhoneFront = true;
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -31,7 +40,7 @@ public class AutonomousDrive extends LinearOpMode {
 
         if (opModeIsActive()) {
             System.out.println("*************** main: started Autonomous....");
-            robot.gyroDrive(this, 0.7f, -6, 0);
+            robot.gyroDrive(this, 0.7f, -12, 0);
             robot.idleFor(this, 0.25f); // Give some time for vuforia to find target
             System.out.println("*************** main: completed 1st turn in Autonomous....");
 
@@ -73,69 +82,31 @@ public class AutonomousDrive extends LinearOpMode {
 
         int turnSign = isRed? -1: 1;
 
-        // Mostly found the BLUE_PERIMETER_2, go close to back wall - center of foundation...
-        robot.encoderInchesDrive(this, 0.75f, turnSign*14, turnSign*14, 5);
-        //robot.printMetrics();robot.idleFor(this, 5);
-        // turn towards Blue wall
-        robot.encoderInchesDrive(this, 0.75f, -turnInches, turnInches, 5);
-        //robot.printMetrics();robot.idleFor(this, 5);
-
-
-        // Raise the foundation holding bars
+        robot.gyroTurn(this, 0.5f, 0.0);
+        robot.gyroDrive(this, 0.7f, -16, GYRO_355);
         robot.setFoundationPower(1.0f);
-        // Go back towards foundation to engage it
-        robot.encoderInchesDrive(this, 0.75f, -12, -12, 5);
-        //robot.printMetrics();robot.idleFor(this, 5);
-        // Down the foundation holding bars to lock the foundation
-        robot.setFoundationPower(-1.0f);robot.idleFor(this, 0.15f);
-        // Move close to blue wall.
-        robot.encoderInchesDrive(this, 0.75f, 24, 24, 5);
-        //unLock Foundation
-        robot.setFoundationPower(0.3f); robot.idleFor(this, 0.25f);
-
-/*
-        // ##################### Do lateral to come out and park at line ##################### //
-        robot.setFoundationPower(0.0f);
-        // Do left lateral until line.....
-        robot.lateralEncodeInchesDrive(this, turnSign*-1.0f, 72, 5);
-        robot.setFoundationPower(-1.0f);robot.idleFor(this, 0.1f);
-        robot.setFoundationPower(0.0f);
-*/
-
-        // ##################### Do lateral and push the foundation and then park at line ##################### //
-        robot.setFoundationPower(0.0f);
-        robot.encoderInchesDrive(this, 0.75f, 4, 4, 5);
-        robot.setFoundationPower(-1.0f);
-        robot.encoderInchesDrive(this, 0.75f, turnSign*-turnInches, turnSign*turnInches, 5);
-        robot.setFoundationPower(0.0f);
-        robot.encoderInchesDrive(this, 0.75f, 28, 28, 5);
-        robot.encoderInchesDrive(this, 0.75f, turnSign*-turnInches, turnSign*turnInches, 5);
-        robot.encoderInchesDrive(this, 0.75f, 40, 40, 5);
-        robot.encoderInchesDrive(this, 0.75f, turnSign*-turnInches, turnSign*turnInches, 5);
-        robot.encoderInchesDrive(this, 0.75f, 28, 28, 5);
-        robot.encoderInchesDrive(this, 0.75f, turnSign*-turnInches, turnSign*turnInches, 5);
-        robot.encoderInchesDrive(this, 0.75f, 46, 46, 5);
-
-        robot.encoderInchesDrive(this, 0.75f, -4, -4, 5);
-        robot.encoderInchesDrive(this, 0.75f, turnSign*-turnInches, turnSign*turnInches, 5);
-        robot.encoderInchesDrive(this, 0.75f, 28, 28, 5);
-        robot.encoderInchesDrive(this, 0.75f, turnSign*turnInches, turnSign*-turnInches, 5);
-        robot.encoderInchesDrive(this, 0.75f, 24, 24, 5);
-        robot.lateralEncodeInchesDrive(this, turnSign*-1.0f, 24, 5);
+        robot.liftAndDropStone(this);
+        robot.gyroDrive(this, 0.7f, 36, GYRO_355);
     }
 
     private void quarySide(boolean isRed) {
         int turnSign = isRed? -1: 1;
 
-        //robot.gyroDrive(this, 0.7f, -6, 0);
+        robot.gyroDrive(this, 0.7f, -6, 0);
         // Turn towards stones
-        robot.gyroTurn(this, 0.5f, 170.0f);
+        robot.gyroTurn(this, 0.5f, GYRO_180);
         //robot.lateralEncodeInchesDrive(this, turnSign*-1.0f, 24, 5);
-        robot.driveMecanumForTime(this, 0.0, turnSign*-1.0, 0.0, 0.5);
-        robot.gyroTurn(this, 0.5f, 170.0f);
+        robot.driveMecanumForTime(this, 0.0, turnSign*-1.0, 0.0, 0.75);
+        robot.gyroTurn(this, 0.5f, GYRO_180);
 
         // Search for 1st skystone
         searchSkystone(isRed);
+        double angleTowardsBackWall = isRed ? GYRO_90 : GYRO_270;
+        robot.gyroTurn(this, 0.5f, angleTowardsBackWall);
+        robot.gyroDrive(this, 0.7f, 60, angleTowardsBackWall);
+        robot.gyroTurn(this, 0.5f, angleTowardsBackWall);
+        goCloseToBackWall(isRed);
+        moveFoundation(isRed);
 /* No time for 2nd stone.... so go and park
         // Go back to start of the stones line
         robot.getClawRotateMotor().setPower(1.0f);
@@ -158,31 +129,85 @@ public class AutonomousDrive extends LinearOpMode {
 
         robot.idleFor(this, 0.25f);
         Navigation.Position pos = null;
-        for(int i = 0; i < 10; i++) {
+        for(int i = 0; i < 15; i++) {
             pos = navigation.getCameraPositionFromTraget(this, Navigation.Target.STONE_TARGET);
             if(pos != null) {
                 break;
             }
             //robot.lateralEncodeInchesDrive(this, turnSign*1.0f, 12, 5);
             robot.driveMecanumForTime(this, 0.0, turnSign*1.0, 0.0, 0.25f);
-            robot.gyroTurn(this, 0.5f, 180.0f);
+            if(i > 0 && i %3 == 0){
+                robot.gyroDrive(this, 0.7f, -3, GYRO_180);
+            }
+            robot.gyroTurn(this, 0.5f, GYRO_180);
             robot.idleFor(this, 0.25f);
+//            robot.gyroHold(this, 0.5, GYRO_180, 0.25);
         }
 
         if(pos != null) {
             System.out.println(String.format("*************** searchSkystone: Position Name:%s, X:%.1f, Y:%.1f, Z:%.1f, ", pos.name, pos.X, pos.Y, pos.Z));
-
-            runtime.reset();
-            robot.startStoneIntake();
-            robot.driveMecanum(0.5, 0.0f, 0.0f);
-            while(opModeIsActive() && runtime.seconds() < 5 && !robot.isStoneCollected()) {
-                idle();
-            }
-            robot.stopRobot();
-            robot.stopStoneIntake();
         } else {
             System.out.println("*************** searchSkystone: Nothing found.....");
         }
+        AnimatronicsRobot.WheelsPosition startWheelPos = robot.getCurrentWheelsPosition();
+        runtime.reset();
+        robot.startStoneIntake();
+        robot.driveMecanum(0.5, 0.0f, 0.0f);
+        while(opModeIsActive() && runtime.seconds() < 5 && !robot.isStoneCollected()) {
+            idle();
+        }
+        robot.stopRobot();
+        robot.stopStoneIntake();
+        robot.getClawServo().setPower(1.0f);
+        AnimatronicsRobot.WheelsPosition endWheelPos = robot.getCurrentWheelsPosition();
+        // Go Back to staring of the stone search
+        double distanceTravveledToFGetStone = robot.distanceTravelled(endWheelPos, startWheelPos);
+        double stoneDist = pos != null ? pos.Z: 12.0;
+        distanceTravveledToFGetStone = distanceTravveledToFGetStone + stoneDist - 12;
+        robot.encoderInchesDrive(this, 0.75f, distanceTravveledToFGetStone, distanceTravveledToFGetStone, 5);
+
+    }
+
+    private void goCloseToBackWall(boolean isRed) {
+
+        String target = isRed ? Navigation.Target.REAR_PERIMETER_2 : Navigation.Target.REAR_PERIMETER_1;
+        gyroGoCloseToTarget(target, 24, 10);
+    }
+
+    private void gyroGoCloseToTarget(String target, double closeDistance, double timeout) {
+
+        int angle = robot.getRobotAngle();
+        double leftSpeed = 0.5;
+        double rightSpeed = 0.5;
+        double  error;
+        double  steer;
+        double  max;
+
+        Navigation.Position pos = navigation.getCameraPositionFromTraget(this, target);
+        runtime.reset();
+        robot.setWheelsSpeed(leftSpeed, leftSpeed, rightSpeed, rightSpeed);
+        while(opModeIsActive() && runtime.seconds() < timeout &&
+                (pos == null || pos.Z > closeDistance)) {
+
+//            error = robot.getError(angle);
+//            steer = robot.getSteer(error, 0.05);
+//
+//            leftSpeed = leftSpeed - steer;
+//            rightSpeed = rightSpeed + steer;
+//
+//            // Normalize speeds if either one exceeds +/- 1.0;
+//            max = Math.max(Math.abs(leftSpeed), Math.abs(rightSpeed));
+//            if (max > 1.0)
+//            {
+//                leftSpeed /= max;
+//                rightSpeed /= max;
+//            }
+//            robot.setWheelsSpeed(leftSpeed, leftSpeed, rightSpeed, rightSpeed);
+
+            robot.idleFor(this, 0.15f);
+            pos = navigation.getCameraPositionFromTraget(this, target);
+        }
+        robot.stopRobot();
     }
 
 }

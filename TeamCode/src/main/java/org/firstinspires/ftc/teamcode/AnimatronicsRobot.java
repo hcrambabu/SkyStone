@@ -43,6 +43,13 @@ public class AnimatronicsRobot {
     static final double COUNTS_PER_INCH = (WHEEL_COUNTS_PER_MOTOR_REV * WHEEL_DRIVE_GEAR_REDUCTION) /
             (WHEEL_DIAMETER_INCHES * 3.1415);
 
+    static final double LIFT_COUNTS_PER_MOTOR_REV = 1440;
+    static final double LIFT_DRIVE_GEAR_REDUCTION = 1.0f;
+    static final double LIFT_DIAMETER_INCHES = 1.25984;
+    static final double LIFT_COUNTS_PER_INCH = (LIFT_COUNTS_PER_MOTOR_REV * LIFT_DRIVE_GEAR_REDUCTION) /
+            (LIFT_DIAMETER_INCHES * 4);
+
+
     static final double     HEADING_THRESHOLD       = 1 ;      // As tight as we can make it with an integer gyro
     static final double     P_TURN_COEFF            = 0.1;     // Larger is more responsive, but also less stable
     static final double     P_DRIVE_COEFF           = 0.15;     // Larger is more responsive, but also less stable
@@ -104,7 +111,7 @@ public class AnimatronicsRobot {
         rightCollector.setDirection(DcMotor.Direction.REVERSE);
     }
 
-    private void setWheelsSpeed(double leftForwardPower, double leftBackPower,
+    public void setWheelsSpeed(double leftForwardPower, double leftBackPower,
                                 double rightForwardPower, double rightBackPower) {
         leftFrontMotor.setPower(leftForwardPower);
         rightFrontMotor.setPower(rightForwardPower);
@@ -112,7 +119,7 @@ public class AnimatronicsRobot {
         rightBackMotor.setPower(rightBackPower);
     }
 
-    public void manualDrive(Gamepad gamepad1, Gamepad gamepad2, Telemetry telemetry) {
+    public void manualDrive(LinearOpMode opMode, Gamepad gamepad1, Gamepad gamepad2, Telemetry telemetry) {
 
         double gp1_lsy = 0, gp1_lsx = 0, gp1_rsy = 0, gp1_rsx = 0;
         if(gamepad1.left_stick_y >= XY_WHEELS_THRESHOLD_POWER ||  gamepad1.left_stick_y <= -XY_WHEELS_THRESHOLD_POWER) gp1_lsy = gamepad1.left_stick_y;
@@ -157,6 +164,10 @@ public class AnimatronicsRobot {
         double collectporPower = gamepad2.left_trigger - gamepad2.right_trigger;
         leftCollector.setPower(collectporPower);
         rightCollector.setPower(collectporPower);
+
+        if(gamepad2.right_bumper) {
+            closeLift(opMode);
+        }
     }
 
     private void setWheelsRunMode(DcMotor.RunMode mode) {
@@ -166,7 +177,7 @@ public class AnimatronicsRobot {
         rightBackMotor.setMode(mode);
     }
 
-    public void enableEncoders(LinearOpMode opMode) throws InterruptedException {
+    public void enableEncoders(LinearOpMode opMode) {
         setWheelsRunMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         liftMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
 
@@ -177,7 +188,9 @@ public class AnimatronicsRobot {
 
         // make sure the gyro is calibrated before continuing
         while (!opMode.isStopRequested() && gyroSensor.isCalibrating())  {
-            Thread.sleep(50);
+            try {
+                Thread.sleep(50);
+            }catch (Exception e){}
             opMode.idle();
         }
         gyroSensor.resetZAxisIntegrator();
@@ -331,6 +344,11 @@ public class AnimatronicsRobot {
         }
     }
 
+    public void moveLift(LinearOpMode opMode, double speed, double inches, double timeoutS) {
+        int newPos = (int) (liftMotor.getCurrentPosition() + (inches * LIFT_COUNTS_PER_INCH));
+        setLiftPosition(opMode, speed, newPos, timeoutS);
+    }
+
     public void setLiftPosition(LinearOpMode opMode, double speed, int targetPosition, double timeoutS) {
         if (opMode.opModeIsActive()) {
             liftMotor.setTargetPosition(targetPosition);
@@ -350,7 +368,7 @@ public class AnimatronicsRobot {
     }
 
 
-    private int lf = 0, lb = 0, rf = 0, rb = 0;
+    private int lf = 0, lb = 0, rf = 0, rb = 0, lp = 0;
     public void printMetrics() {
         System.out.println("***************  lf: " + (leftFrontMotor.getCurrentPosition()-lf)/COUNTS_PER_INCH+
                         ", lb: " + (leftBackMotor.getCurrentPosition()-lb)/COUNTS_PER_INCH +
@@ -360,7 +378,10 @@ public class AnimatronicsRobot {
         lb = leftBackMotor.getCurrentPosition();
         rf = rightFrontMotor.getCurrentPosition();
         rb = rightBackMotor.getCurrentPosition();
-        System.out.println("***************  lift: " + liftMotor.getCurrentPosition());
+        System.out.println("***************  lift: " + liftMotor.getCurrentPosition() + " -> " + (liftMotor.getCurrentPosition()-lp)/LIFT_COUNTS_PER_INCH + " in");
+        lp = liftMotor.getCurrentPosition();
+        System.out.println("*************** robotAngle:" + gyroSensor.getIntegratedZValue());
+        System.out.println("*************** distance:"+ distanceSensor.getDistance(DistanceUnit.INCH));
     }
 
     public WheelsPosition getCurrentWheelsPosition() {
@@ -389,8 +410,8 @@ public class AnimatronicsRobot {
         runtime.reset();
         try {
             while (runtime.seconds() < sec) {
-                //opMode.idle();
                 Thread.sleep(50);
+                opMode.idle();
             }
         } catch (InterruptedException ex){}
     }
@@ -603,9 +624,9 @@ public class AnimatronicsRobot {
 
         // calculate error in -179 to +180 range  (
         robotError = targetAngle - gyroSensor.getIntegratedZValue();
-        System.out.println("*************** getError: robotError:"+ robotError + ", robotAngle:"+gyroSensor.getIntegratedZValue());
         while (robotError > 180)  robotError -= 360;
         while (robotError <= -180) robotError += 360;
+        System.out.println("*************** getError: robotError:"+ robotError + ", robotAngle:"+gyroSensor.getIntegratedZValue());
         return robotError;
     }
 
@@ -617,6 +638,10 @@ public class AnimatronicsRobot {
      */
     public double getSteer(double error, double PCoeff) {
         return Range.clip(error * PCoeff, -1, 1);
+    }
+
+    public int getRobotAngle() {
+        return gyroSensor.getIntegratedZValue();
     }
 
 
@@ -633,5 +658,45 @@ public class AnimatronicsRobot {
     public boolean isStoneCollected() {
         System.out.println("*************** isStoneCollected: distance:"+ distanceSensor.getDistance(DistanceUnit.INCH));
         return distanceSensor.getDistance(DistanceUnit.INCH) < 2.0f;
+    }
+
+    public Servo getClawTwistServo() {
+        return clawTwistServo;
+    }
+
+    public CRServo getClawServo() {
+        return clawServo;
+    }
+
+    public void liftAndDropStone(LinearOpMode opMode) {
+        final AnimatronicsRobot thisRobot = this;
+        final LinearOpMode finalPpMode = opMode;
+//        Thread t = new Thread(new Runnable() {
+//            @Override
+//            public void run() {
+                thisRobot.setLiftPosition(finalPpMode, 1.0, -4250, 5); // lift up
+                thisRobot.getClawTwistServo().setPosition(1.0); // twist back
+                thisRobot.setLiftPosition(finalPpMode, 1.0, 0, 2); // lift down
+                thisRobot.getClawServo().setPower(-1.0f); // release stone
+//            }
+//        });
+//        t.setPriority(Thread.MAX_PRIORITY);
+//        t.start();
+    }
+
+    public void closeLift(LinearOpMode opMode) {
+        final AnimatronicsRobot thisRobot = this;
+        final LinearOpMode finalPpMode = opMode;
+//        Thread t = new Thread(new Runnable() {
+//            @Override
+//            public void run() {
+                thisRobot.setLiftPosition(finalPpMode, 1.0, -4250, 5); // lift up
+                thisRobot.getClawTwistServo().setPosition(0.0); // twist to front
+                thisRobot.setLiftPosition(finalPpMode, 1.0, 0, 2); // lift down
+                thisRobot.getClawServo().setPower(-1.0f); // release stone
+//            }
+//        });
+//        t.setPriority(Thread.MAX_PRIORITY);
+//        t.start();
     }
 }
