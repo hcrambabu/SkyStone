@@ -24,7 +24,6 @@ class MecanumDrive {
         this.backRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
         this.gyroSensor = gyroSensor;
-        this.gyroSensor.resetZAxisIntegrator();
     }
 
     void setSpeeds(double flSpeed, double frSpeed, double blSpeed, double brSpeed) {

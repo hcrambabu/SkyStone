@@ -8,8 +8,8 @@ import org.firstinspires.ftc.robotcore.external.tfod.Recognition;
 
 import java.util.List;
 
-@Autonomous(name = "AutonomousDrive")
-public class AutonomousDrive extends LinearOpMode {
+@Autonomous(name = "QuarryOnlyDrive")
+public class QuarryOnlyDrive extends LinearOpMode {
 
     AutonomousCommon autonomous = new AutonomousCommon();
     private ElapsedTime runtime = new ElapsedTime();
@@ -27,7 +27,7 @@ public class AutonomousDrive extends LinearOpMode {
         telemetry.addData(">", "Started...");
         telemetry.update();
         List<Recognition> stones = autonomous.scanStones();
-        autonomous.quarrySideFullAutonomous();
+        autonomous.quarrySideOnlyAutonomous();
 
         while(opModeIsActive()) {
             idle();

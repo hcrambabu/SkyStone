@@ -3,12 +3,14 @@ package org.firstinspires.ftc.teamcode;
 import com.qualcomm.hardware.modernrobotics.ModernRoboticsI2cGyro;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.CRServo;
+import com.qualcomm.robotcore.hardware.ColorSensor;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.GyroSensor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.TouchSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -24,28 +26,33 @@ public class AnimatronicsRobot {
     private DcMotor rightFrontMotor;
     private DcMotor leftBackMotor;
     private DcMotor rightBackMotor;
-    private DcMotor liftMotor;
+
+    private DcMotor liftMotor_1;
+    private DcMotor liftMotor_2;
 
     private DcMotor leftCollector;
     private DcMotor rightCollector;
 
-    private DcMotor foundationMotor;
+    private Servo stoneHolderServo;
+    private Servo stoneMoverServo;
+    private Servo capStoneServo;
 
-    private Servo   clawTwistServo;
-    private CRServo clawServo;
+    private Servo foundationServo_1;
+    private Servo foundationServo_2;
 
     private DistanceSensor distanceSensor;
+    private NormalizedColorSensor colorSensor;
     private ModernRoboticsI2cGyro gyroSensor;
 
-    static final double WHEEL_COUNTS_PER_MOTOR_REV = 1120;
-    static final double WHEEL_DRIVE_GEAR_REDUCTION = 45.0f/80.0f;
-    static final double WHEEL_DIAMETER_INCHES = 4.0;
+    static final double WHEEL_COUNTS_PER_MOTOR_REV = 383.6;
+    static final double WHEEL_DRIVE_GEAR_REDUCTION = 28.0f/14.0f;
+    static final double WHEEL_DIAMETER_INCHES = 3.937;
     static final double COUNTS_PER_INCH = (WHEEL_COUNTS_PER_MOTOR_REV * WHEEL_DRIVE_GEAR_REDUCTION) /
             (WHEEL_DIAMETER_INCHES * 3.1415);
 
-    static final double LIFT_COUNTS_PER_MOTOR_REV = 1440;
+    static final double LIFT_COUNTS_PER_MOTOR_REV = 383.6;
     static final double LIFT_DRIVE_GEAR_REDUCTION = 1.0f;
-    static final double LIFT_DIAMETER_INCHES = 1.25984;
+    static final double LIFT_DIAMETER_INCHES = 1.3535433;
     static final double LIFT_COUNTS_PER_INCH = (LIFT_COUNTS_PER_MOTOR_REV * LIFT_DRIVE_GEAR_REDUCTION) /
             (LIFT_DIAMETER_INCHES * 4);
 
@@ -53,13 +60,10 @@ public class AnimatronicsRobot {
     static final double     P_TURN_COEFF            = 0.1;     // Larger is more responsive, but also less stable
     static final double     P_DRIVE_COEFF           = 0.15;     // Larger is more responsive, but also less stable
 
+    public static final double TURN_INCHES_90 = 20.5;
+
     private ElapsedTime runtime = new ElapsedTime();
-
-    private static final double XY_WHEELS_THRESHOLD_POWER = 0.0f;
-
     private MecanumDrive mecanumDrive;
-
-    private boolean holdTheStone = false;
 
     public AnimatronicsRobot() {
 
@@ -78,36 +82,53 @@ public class AnimatronicsRobot {
         leftCollector = hardwareMap.get(DcMotor.class, "collect1");
         rightCollector = hardwareMap.get(DcMotor.class, "collect2");
 
-        liftMotor = hardwareMap.get(DcMotor.class, "lift");
-        foundationMotor = hardwareMap.get(DcMotor.class, "foundation");
+        liftMotor_1 = hardwareMap.get(DcMotor.class, "lift1");
+        liftMotor_2 = hardwareMap.get(DcMotor.class, "lift2");
 
-        clawTwistServo = hardwareMap.get(Servo.class, "clawtwist");
-        clawServo = hardwareMap.get(CRServo.class, "claw");
+        stoneHolderServo = hardwareMap.get(Servo.class, "stone_holder");
+        stoneMoverServo = hardwareMap.get(Servo.class, "stone_mover");
+        capStoneServo = hardwareMap.get(Servo.class, "cap_stone");
+
+        foundationServo_1 = hardwareMap.get(Servo.class, "foundation1");
+        foundationServo_2 = hardwareMap.get(Servo.class, "foundation2");
 
         distanceSensor = hardwareMap.get(DistanceSensor.class, "distance");
         gyroSensor = (ModernRoboticsI2cGyro)hardwareMap.gyroSensor.get("gyro");
+        colorSensor = hardwareMap.get(NormalizedColorSensor.class, "color");
 
         leftFrontMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         leftBackMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightFrontMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightBackMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        liftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        //foundationMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+
+        liftMotor_1.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        liftMotor_2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         leftCollector.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
         rightCollector.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
 
-        leftFrontMotor.setDirection(DcMotor.Direction.FORWARD);
-        rightFrontMotor.setDirection(DcMotor.Direction.REVERSE);
-        leftBackMotor.setDirection(DcMotor.Direction.FORWARD);
-        rightBackMotor.setDirection(DcMotor.Direction.REVERSE);
+        leftFrontMotor.setDirection(DcMotor.Direction.REVERSE);
+        rightFrontMotor.setDirection(DcMotor.Direction.FORWARD);
+        leftBackMotor.setDirection(DcMotor.Direction.REVERSE);
+        rightBackMotor.setDirection(DcMotor.Direction.FORWARD);
 
-        foundationMotor.setDirection(DcMotor.Direction.REVERSE);
-        liftMotor.setDirection(DcMotor.Direction.FORWARD);
-        clawServo.setDirection(DcMotor.Direction.FORWARD);
+        liftMotor_1.setDirection(DcMotor.Direction.REVERSE);
+        liftMotor_1.setDirection(DcMotor.Direction.FORWARD);
 
         leftCollector.setDirection(DcMotor.Direction.FORWARD);
         rightCollector.setDirection(DcMotor.Direction.REVERSE);
+
+        stoneMoverServo.setPosition(0.0f);
+        stoneHolderServo.setPosition(0.0f);
+        capStoneServo.setPosition(0.0f);
+
+        foundationServo_1.setPosition(0.0f);
+        foundationServo_2.setPosition(1.0f);
+    }
+
+    public void setLiftZeroPowerBehavior(DcMotor.ZeroPowerBehavior zeroPowerBehavior) {
+        liftMotor_1.setZeroPowerBehavior(zeroPowerBehavior);
+        liftMotor_2.setZeroPowerBehavior(zeroPowerBehavior);
     }
 
     public void setWheelsSpeed(double leftForwardPower, double leftBackPower,
@@ -120,52 +141,41 @@ public class AnimatronicsRobot {
 
     public void manualDrive(LinearOpMode opMode, Gamepad gamepad1, Gamepad gamepad2, Telemetry telemetry) {
 
-        double gp1_lsy = 0, gp1_lsx = 0, gp1_rsy = 0, gp1_rsx = 0;
-        if(gamepad1.left_stick_y >= XY_WHEELS_THRESHOLD_POWER ||  gamepad1.left_stick_y <= -XY_WHEELS_THRESHOLD_POWER) gp1_lsy = gamepad1.left_stick_y;
-        if(gamepad1.left_stick_x >= XY_WHEELS_THRESHOLD_POWER ||  gamepad1.left_stick_x <= -XY_WHEELS_THRESHOLD_POWER) gp1_lsx = gamepad1.left_stick_x;
-        if(gamepad1.right_stick_y >= XY_WHEELS_THRESHOLD_POWER ||  gamepad1.right_stick_y <= -XY_WHEELS_THRESHOLD_POWER) gp1_rsy = gamepad1.right_stick_y;
-        if(gamepad1.right_stick_x >= XY_WHEELS_THRESHOLD_POWER ||  gamepad1.right_stick_x <= -XY_WHEELS_THRESHOLD_POWER) gp1_rsx = gamepad1.right_stick_x;
+        mecanumDrive.driveMecanum(-gamepad1.left_stick_y, gamepad1.left_stick_x, gamepad1.right_stick_x);
 
-        double leftForwardPower = -(gp1_lsy - gp1_lsx);
-        double leftBackPower = -(gp1_lsy + gp1_lsx);
-        double rightForwardPower = -(gp1_rsy + gp1_rsx);
-        double rightBackPower = -(gp1_rsy - gp1_rsx);
+        double liftPower = -gamepad2.left_stick_y;
+        liftMotor_1.setPower(liftPower);
+        liftMotor_2.setPower(liftPower);
 
-        setWheelsSpeed(leftForwardPower, leftBackPower, rightForwardPower, rightBackPower);
-
-        if(gamepad2.x) {
-            clawTwistServo.setPosition(0.0f);
-        } else if(gamepad2.y) {
-            clawTwistServo.setPosition(1.0f);
-        }
-
-        if(gamepad2.a) holdTheStone = true;
-        if(gamepad2.b) holdTheStone = false;
-
-        if(holdTheStone) {
-            clawServo.setPower(1.0f);
-        } else {
-            clawServo.setPower(-1.0f);
-        }
-
-        double liftPower = gamepad1.left_trigger - gamepad1.right_trigger;
-        liftMotor.setPower(liftPower);
-
-        if(gamepad1.dpad_up || gamepad2.dpad_up){
-            foundationMotor.setPower(1.0f);
-        }
-        else if(gamepad1.dpad_down || gamepad2.dpad_down) {
-            foundationMotor.setPower(-1.0f);
-        } else if(gamepad1.dpad_left || gamepad1.dpad_right || gamepad2.dpad_left || gamepad2.dpad_right) {
-            foundationMotor.setPower(0.0f);
-        }
-
-        double collectporPower = gamepad2.left_trigger - gamepad2.right_trigger;
+        double collectporPower = -gamepad2.right_stick_y;
         leftCollector.setPower(collectporPower);
         rightCollector.setPower(collectporPower);
 
         if(gamepad2.right_bumper) {
-            closeLift(opMode);
+            stoneHolderServo.setPosition(1.0f);
+        } else if(gamepad2.left_bumper){
+            stoneHolderServo.setPosition(0.0f);
+        }
+
+        if(gamepad2.right_trigger > 0.5f) {
+            stoneMoverServo.setPosition(0.7f);
+        } else if(gamepad2.left_trigger > 0.5f) {
+            stoneMoverServo.setPosition(0.0f);
+            stoneHolderServo.setPosition(0.0f);
+        }
+
+        if(gamepad1.right_bumper) {
+            foundationServo_1.setPosition(1.0f);
+            foundationServo_2.setPosition(0.0f);
+        } else if(gamepad1.left_bumper) {
+            foundationServo_1.setPosition(0.0f);
+            foundationServo_2.setPosition(1.0f);
+        }
+
+        if(gamepad1.dpad_up) {
+            capStoneServo.setPosition(0.0f);
+        } else if(gamepad1.dpad_down) {
+            capStoneServo.setPosition(1.0f);
         }
     }
 
@@ -178,10 +188,12 @@ public class AnimatronicsRobot {
 
     public void enableEncoders(LinearOpMode opMode) {
         setWheelsRunMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        liftMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        liftMotor_1.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        liftMotor_2.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
 
         setWheelsRunMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        liftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        liftMotor_1.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        liftMotor_2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
         gyroSensor.calibrate();
 
@@ -189,13 +201,12 @@ public class AnimatronicsRobot {
         while (!opMode.isStopRequested() && gyroSensor.isCalibrating())  {
             try {
                 Thread.sleep(50);
+                opMode.idle();
             }catch (Exception e){}
-            opMode.idle();
         }
         gyroSensor.resetZAxisIntegrator();
         mecanumDrive = new MecanumDrive(leftFrontMotor, rightFrontMotor, leftBackMotor, rightBackMotor, gyroSensor);
     }
-
 
     public void driveMecanum(double forward, double strafe, double rotate) {
         mecanumDrive.driveMecanum(forward, strafe, rotate);
@@ -302,10 +313,15 @@ public class AnimatronicsRobot {
 
     public void encoderInchesDrive(LinearOpMode opMode, double speed, double leftInches, double rightInches, double timeoutS) {
 
-        encoderPositionDrive(opMode, speed, (int) (leftInches * COUNTS_PER_INCH), (int) (rightInches * COUNTS_PER_INCH), timeoutS);
+        encoderPositionDrive(opMode, speed, (int) (leftInches * COUNTS_PER_INCH), (int) (rightInches * COUNTS_PER_INCH), timeoutS, false, 0.0);
     }
 
-    public void encoderPositionDrive(LinearOpMode opMode, double speed, int leftPos, int rightPos, double timeoutS) {
+    public void encoderInchesDrive(LinearOpMode opMode, double speed, double leftInches, double rightInches, double timeoutS, double liftPower) {
+
+        encoderPositionDrive(opMode, speed, (int) (leftInches * COUNTS_PER_INCH), (int) (rightInches * COUNTS_PER_INCH), timeoutS, true, liftPower);
+    }
+
+    public void encoderPositionDrive(LinearOpMode opMode, double speed, int leftPos, int rightPos, double timeoutS, boolean setLift, double liftPower) {
         int newLFTarget;
         int newLBTarget;
         int newRFTarget;
@@ -336,6 +352,7 @@ public class AnimatronicsRobot {
                     (leftFrontMotor.isBusy() && rightFrontMotor.isBusy() && leftBackMotor.isBusy() && rightBackMotor.isBusy())) {
                 opMode.idle();
             }
+            if(setLift) setLiftPower(liftPower);
             stopRobot();
 
             // Turn off RUN_TO_POSITION
@@ -344,29 +361,39 @@ public class AnimatronicsRobot {
     }
 
     public void moveLift(LinearOpMode opMode, double speed, double inches, double timeoutS) {
-        int newPos = (int) (liftMotor.getCurrentPosition() + (inches * LIFT_COUNTS_PER_INCH));
-        setLiftPosition(opMode, speed, newPos, timeoutS);
+        int newPos1 = (int) (liftMotor_1.getCurrentPosition() + (inches * LIFT_COUNTS_PER_INCH));
+        int newPos2 = (int) (liftMotor_2.getCurrentPosition() + (inches * LIFT_COUNTS_PER_INCH));
+        setLiftPosition(opMode, speed, newPos1, newPos2, timeoutS);
     }
 
-    public void setLiftPosition(LinearOpMode opMode, double speed, int targetPosition, double timeoutS) {
+    public void setLiftPosition(LinearOpMode opMode, double speed, int targetPosition1, int targetPosition2, double timeoutS) {
         if (opMode.opModeIsActive()) {
-            liftMotor.setTargetPosition(targetPosition);
-            liftMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            liftMotor_1.setTargetPosition(targetPosition1);
+            liftMotor_2.setTargetPosition(targetPosition2);
+            liftMotor_1.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            liftMotor_2.setMode(DcMotor.RunMode.RUN_TO_POSITION);
             runtime.reset();
-            liftMotor.setPower(Math.abs(speed));
-            while (opMode.opModeIsActive() && liftMotor.isBusy() && (runtime.seconds() < timeoutS)) {
+            liftMotor_1.setPower(Math.abs(speed));
+            liftMotor_2.setPower(Math.abs(speed));
+            while (opMode.opModeIsActive() &&
+                    (runtime.seconds() < timeoutS) &&
+                    (liftMotor_1.isBusy() && liftMotor_2.isBusy())) {
                 opMode.idle();
             }
-            liftMotor.setPower(0);
-            liftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            liftMotor_1.setPower(0);
+            liftMotor_2.setPower(0);
+            liftMotor_1.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            liftMotor_2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         }
     }
 
-    public void setFoundationPower(double foundationPower) {
-        foundationMotor.setPower(foundationPower);
+    public void setFoundationPosition(double foundationPosition) {
+
+        foundationServo_1.setPosition(foundationPosition);
+        foundationServo_2.setPosition(1.0 - foundationPosition);
     }
 
-    private int lf = 0, lb = 0, rf = 0, rb = 0, lp = 0;
+    private int lf = 0, lb = 0, rf = 0, rb = 0, lp_1 = 0, lp_2 = 0;
     public void printMetrics() {
         System.out.println("***************  lf: " + (leftFrontMotor.getCurrentPosition()-lf)/COUNTS_PER_INCH+
                         ", lb: " + (leftBackMotor.getCurrentPosition()-lb)/COUNTS_PER_INCH +
@@ -376,9 +403,11 @@ public class AnimatronicsRobot {
         lb = leftBackMotor.getCurrentPosition();
         rf = rightFrontMotor.getCurrentPosition();
         rb = rightBackMotor.getCurrentPosition();
-        System.out.println("***************  lift: " + liftMotor.getCurrentPosition() + " -> " + (liftMotor.getCurrentPosition()-lp)/LIFT_COUNTS_PER_INCH + " in");
-        lp = liftMotor.getCurrentPosition();
-        System.out.println("*************** robotAngle:" + gyroSensor.getIntegratedZValue());
+        System.out.println("***************  lift_1: " + liftMotor_1.getCurrentPosition() + " -> " + (liftMotor_1.getCurrentPosition()-lp_1)/LIFT_COUNTS_PER_INCH + " in");
+        System.out.println("***************  lift_2: " + liftMotor_2.getCurrentPosition() + " -> " + (liftMotor_2.getCurrentPosition()-lp_2)/LIFT_COUNTS_PER_INCH + " in");
+        lp_1 = liftMotor_1.getCurrentPosition();
+        lp_2 = liftMotor_2.getCurrentPosition();
+        System.out.println("*************** robotAngle:" + gyroSensor.getIntegratedZValue() + ", Heading:" + gyroSensor.getHeading());
         System.out.println("*************** distance:"+ distanceSensor.getDistance(DistanceUnit.INCH));
     }
 
@@ -406,12 +435,9 @@ public class AnimatronicsRobot {
 
     public void idleFor(LinearOpMode opMode, double sec) {
         runtime.reset();
-        try {
-            while (runtime.seconds() < sec) {
-                Thread.sleep(50);
-                opMode.idle();
-            }
-        } catch (InterruptedException ex){}
+        while (runtime.seconds() < sec) {
+            opMode.idle();
+        }
     }
 
     class WheelsPosition {
@@ -643,8 +669,8 @@ public class AnimatronicsRobot {
     }
 
     public void startStoneIntake() {
-        leftCollector.setPower(-0.7f);
-        rightCollector.setPower(-0.7f);
+        leftCollector.setPower(-0.9f);
+        rightCollector.setPower(-0.9f);
     }
 
     public void stopStoneIntake() {
@@ -652,48 +678,41 @@ public class AnimatronicsRobot {
         rightCollector.setPower(0.0f);
     }
 
+    public void spitStoneOut() {
+        leftCollector.setPower(1.0f);
+        rightCollector.setPower(1.0f);
+    }
+
     public boolean isStoneCollected() {
         System.out.println("*************** isStoneCollected: distance:"+ distanceSensor.getDistance(DistanceUnit.INCH));
         return distanceSensor.getDistance(DistanceUnit.INCH) < 2.0f;
     }
 
-    public Servo getClawTwistServo() {
-        return clawTwistServo;
-    }
-
-    public CRServo getClawServo() {
-        return clawServo;
-    }
-
     public void liftAndDropStone(LinearOpMode opMode) {
-        final AnimatronicsRobot thisRobot = this;
-        final LinearOpMode finalPpMode = opMode;
-//        Thread t = new Thread(new Runnable() {
-//            @Override
-//            public void run() {
-                thisRobot.setLiftPosition(finalPpMode, 1.0, -4250, 5); // lift up
-                thisRobot.getClawTwistServo().setPosition(1.0); // twist back
-                thisRobot.setLiftPosition(finalPpMode, 1.0, 0, 2); // lift down
-                thisRobot.getClawServo().setPower(-1.0f); // release stone
-//            }
-//        });
-//        t.setPriority(Thread.MAX_PRIORITY);
-//        t.start();
+
     }
 
     public void closeLift(LinearOpMode opMode) {
-        final AnimatronicsRobot thisRobot = this;
-        final LinearOpMode finalPpMode = opMode;
-//        Thread t = new Thread(new Runnable() {
-//            @Override
-//            public void run() {
-                thisRobot.setLiftPosition(finalPpMode, 1.0, -4250, 5); // lift up
-                thisRobot.getClawTwistServo().setPosition(0.0); // twist to front
-                thisRobot.setLiftPosition(finalPpMode, 1.0, 0, 2); // lift down
-                thisRobot.getClawServo().setPower(-1.0f); // release stone
-//            }
-//        });
-//        t.setPriority(Thread.MAX_PRIORITY);
-//        t.start();
+    }
+
+    public int getBlue() {
+        return Range.clip((int)(this.colorSensor.getNormalizedColors().blue   * 256), 0, 255);
+    }
+
+    public int getRed() {
+        return Range.clip((int)(this.colorSensor.getNormalizedColors().red   * 256), 0, 255);
+    }
+
+    public Servo getStoneHolderServo() {
+        return stoneHolderServo;
+    }
+
+    public Servo getStoneMoverServo() {
+        return stoneMoverServo;
+    }
+
+    public void setLiftPower(double power) {
+        liftMotor_1.setPower(power);
+        liftMotor_2.setPower(power);
     }
 }
